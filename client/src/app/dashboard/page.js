@@ -68,7 +68,7 @@ export default function DashboardPage() {
       if (!token) {
         throw new Error('No access token found. Please log in again.');
       }
-      const response = await fetch('http://localhost:5000/api/transactions', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export default function DashboardPage() {
         throw new Error('No access token found. Please log in again.');
       }
       // You may want to POST to a different endpoint for expenses, or add a type field
-      const response = await fetch('http://localhost:5000/api/transactions', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -139,7 +139,7 @@ export default function DashboardPage() {
   const fetchTotalAmount = async () => {
     try {
       const token = await getApiToken();
-      const response = await fetch('http://localhost:5000/api/transactions/total', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/total`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

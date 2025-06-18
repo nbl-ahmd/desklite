@@ -35,7 +35,7 @@ export default function TransactionsPage() {
   const fetchTransactions = async () => {
     try {
       const token = await getApiToken();
-      const response = await fetch('http://localhost:5000/api/transactions', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export default function TransactionsPage() {
 
     try {
       const token = await getApiToken();
-      const response = await fetch(`http://localhost:5000/api/transactions/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ export default function TransactionsPage() {
     e.preventDefault();
     try {
       const token = await getApiToken();
-      const response = await fetch(`http://localhost:5000/api/transactions/${editingTransaction._id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/${editingTransaction._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
