@@ -2,7 +2,7 @@
   "name": "Ledger Book",
   "short_name": "Ledger",
   "description": "A simple transaction management app for small businesses",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0ea5e9",
