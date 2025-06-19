@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -19,6 +19,8 @@ export default function TransactionsPage() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRefs = useRef({});
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -261,7 +263,8 @@ export default function TransactionsPage() {
 
         {/* Transactions List */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -284,24 +287,24 @@ export default function TransactionsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTransactions.map((transaction) => (
-                  <tr key={transaction._id}>
+                  <tr key={transaction._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {format(new Date(transaction.date), 'MMM d, yyyy h:mm a')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      ₹{transaction.amount}
-                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.mode.charAt(0).toUpperCase() + transaction.mode.slice(1)}
+                      {transaction.type === 'income' ? (
+                        <>{transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)}</>
+                      ) : (
+                        'expense'
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {transaction.mode === 'credit' ? (
                         <>
                           {transaction.customerName}
                           <br />
-                          <span className="text-xs text-gray-400">
-                            {transaction.customerPhone}
-                          </span>
+                          <span className="text-xs text-gray-400">{transaction.customerPhone}</span>
                         </>
                       ) : (
                         '-'
@@ -311,13 +314,13 @@ export default function TransactionsPage() {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(transaction)}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-primary-600 hover:text-primary-900 font-medium"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(transaction._id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 font-medium"
                         >
                           Delete
                         </button>
@@ -327,6 +330,60 @@ export default function TransactionsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          {/* Mobile Card List */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {filteredTransactions.length === 0 && (
+              <div className="p-4 text-center text-gray-400">No transactions found.</div>
+            )}
+            {filteredTransactions.map((transaction) => (
+              <div key={transaction._id} className="p-3 flex items-center hover:bg-gray-50 transition-colors relative">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">{format(new Date(transaction.date), 'MMM d, yyyy h:mm a')}</span>
+                    <span className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm mt-1">
+                    <span className="font-medium">{transaction.type === 'income' ? (transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)) : 'Expense'}</span>
+                    {transaction.mode === 'credit' && (
+                      <span className="text-xs text-gray-500">{transaction.customerName} <span className="text-gray-300">|</span> {transaction.customerPhone}</span>
+                    )}
+                  </div>
+                </div>
+                {/* Three dots menu */}
+                <div className="ml-2 relative flex-shrink-0">
+                  <button
+                    aria-label="Open actions"
+                    className="p-2 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    onClick={() => setOpenMenuId(openMenuId === transaction._id ? null : transaction._id)}
+                    ref={el => menuRefs.current[transaction._id] = el}
+                  >
+                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <circle cx="12" cy="5" r="1.5" />
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="12" cy="19" r="1.5" />
+                    </svg>
+                  </button>
+                  {/* Popover menu */}
+                  {openMenuId === transaction._id && (
+                    <div className="absolute right-0 z-20 mt-2 w-28 bg-white rounded shadow-lg ring-1 ring-black ring-opacity-5 animate-fade-in">
+                      <button
+                        onClick={() => { setOpenMenuId(null); handleEdit(transaction); }}
+                        className="block w-full text-left px-4 py-2 text-sm text-primary-700 hover:bg-primary-50 rounded-t"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => { setOpenMenuId(null); handleDelete(transaction._id); }}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

@@ -50,7 +50,7 @@ const handler = NextAuth({
         token.id = user.id;
         token.username = user.username;
         token.name = user.name;
-        console.log('User:', user); // 🐛 debug line
+        //console.log('User:', user); // 🐛 debug line
         // Add a signed token for backend
         token.accessToken = jwt.sign(
           { id: user.id, username: user.username },
