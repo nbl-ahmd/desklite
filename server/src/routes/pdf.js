@@ -92,7 +92,8 @@ router.post('/expense-split', async (req, res) => {
       </html>
     `;
 
-   const browser = await puppeteer.launch({
+const browser = await puppeteer.launch({
+  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   args: ['--no-sandbox', '--disable-setuid-sandbox'],
 });
     const page = await browser.newPage();
