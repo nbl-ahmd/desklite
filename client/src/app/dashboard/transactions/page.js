@@ -17,6 +17,7 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState('all');
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
@@ -32,7 +33,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     filterTransactions();
-  }, [transactions, selectedMode, dateRange, customStartDate, customEndDate]);
+  }, [transactions, selectedMode, dateRange, customStartDate, customEndDate, selectedCustomer]);
 
   const fetchTransactions = async () => {
     try {
@@ -60,6 +61,11 @@ export default function TransactionsPage() {
     // Filter by payment mode
     if (selectedMode !== 'all') {
       filtered = filtered.filter(t => t.mode === selectedMode);
+    }
+
+    // Filter by customer name
+    if (selectedCustomer !== 'all') {
+      filtered = filtered.filter(t => t.customerName === selectedCustomer);
     }
 
     // Filter by date range
@@ -136,20 +142,33 @@ export default function TransactionsPage() {
     e.preventDefault();
     try {
       const token = await getApiToken();
+      
+      // Ensure expense transactions have a default mode
+      const updateData = {
+        ...editingTransaction,
+        mode: editingTransaction.type === 'expense' && !editingTransaction.mode ? 'cash' : editingTransaction.mode
+      };
+      
+      console.log('Sending update data:', updateData);
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/${editingTransaction._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(editingTransaction),
+        body: JSON.stringify(updateData),
       });
 
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Server error response:', errorData);
+        console.error('Validation errors:', errorData.errors);
         throw new Error('Failed to update transaction');
       }
 
       const updatedTransaction = await response.json();
+      console.log('Updated transaction response:', updatedTransaction);
       setTransactions(transactions.map(t => 
         t._id === updatedTransaction._id ? updatedTransaction : t
       ));
@@ -242,6 +261,17 @@ export default function TransactionsPage() {
               <option value="custom">Custom Range</option>
             </select>
 
+            <select
+              value={selectedCustomer}
+              onChange={(e) => setSelectedCustomer(e.target.value)}
+              className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            >
+              <option value="all">All Customers</option>
+              {Array.from(new Set(transactions.filter(t => t.customerName).map(t => t.customerName))).sort().map(customer => (
+                <option key={customer} value={customer}>{customer}</option>
+              ))}
+            </select>
+
             {dateRange === 'custom' && (
               <div className="flex gap-2">
                 <input
@@ -281,6 +311,9 @@ export default function TransactionsPage() {
                     Customer
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Note
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -294,21 +327,30 @@ export default function TransactionsPage() {
                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {transaction.type === 'income' ? (
-                        <>{transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)}</>
+                        <>
+                          {transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)}
+                        </>
                       ) : (
-                        'expense'
+                        transaction.mode ? transaction.mode.charAt(0).toUpperCase() + transaction.mode.slice(1) : 'Cash'
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.mode === 'credit' ? (
+                      {transaction.customerName ? (
                         <>
                           {transaction.customerName}
-                          <br />
-                          <span className="text-xs text-gray-400">{transaction.customerPhone}</span>
+                          {transaction.customerPhone && (
+                            <>
+                              <br />
+                              <span className="text-xs text-gray-400">{transaction.customerPhone}</span>
+                            </>
+                          )}
                         </>
                       ) : (
                         '-'
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {transaction.description || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex space-x-2">
@@ -344,11 +386,21 @@ export default function TransactionsPage() {
                     <span className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
-                    <span className="font-medium">{transaction.type === 'income' ? (transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)) : 'Expense'}</span>
-                    {transaction.mode === 'credit' && (
-                      <span className="text-xs text-gray-500">{transaction.customerName} <span className="text-gray-300">|</span> {transaction.customerPhone}</span>
+                    <span className="font-medium">
+                      {transaction.type === 'income' 
+                        ? (transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1))
+                        : (transaction.mode ? transaction.mode.charAt(0).toUpperCase() + transaction.mode.slice(1) : 'Cash')
+                      }
+                    </span>
+                    {transaction.customerName && (
+                      <span className="text-xs text-gray-500">{transaction.customerName} {transaction.customerPhone && <><span className="text-gray-300">|</span> {transaction.customerPhone}</>}</span>
                     )}
                   </div>
+                  {transaction.description && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      {transaction.description}
+                    </div>
+                  )}
                 </div>
                 {/* Three dots menu */}
                 <div className="ml-2 relative flex-shrink-0">
@@ -424,6 +476,34 @@ export default function TransactionsPage() {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Customer Name</label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    value={editingTransaction.customerName || ''}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      customerName: e.target.value
+                    })}
+                    placeholder="Enter customer name (optional)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Customer Phone</label>
+                  <input
+                    type="tel"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    value={editingTransaction.customerPhone || ''}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      customerPhone: e.target.value
+                    })}
+                    placeholder="Enter customer phone (optional)"
+                  />
+                </div>
+
                 {editingTransaction.mode === 'credit' && (
                   <>
                     <div>
@@ -454,6 +534,20 @@ export default function TransactionsPage() {
                     </div>
                   </>
                 )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Note/Description (optional)</label>
+                  <textarea
+                    rows="3"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                    value={editingTransaction.description || ''}
+                    onChange={(e) => setEditingTransaction({
+                      ...editingTransaction,
+                      description: e.target.value
+                    })}
+                    placeholder="Add a note or description for this transaction..."
+                  />
+                </div>
 
                 <div className="flex justify-end space-x-2">
                   <button

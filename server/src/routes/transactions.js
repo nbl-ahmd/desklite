@@ -5,12 +5,33 @@ const { body, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const mongoose = require('mongoose');
 
-// Middleware to validate transaction data
+// Middleware to validate transaction data for creation
 const validateTransaction = [
   body('amount').isNumeric().withMessage('Amount must be a number'),
   body('mode').isIn(['cash', 'upi', 'credit']).withMessage('Invalid payment mode'),
   body('customerName').if(body('mode').equals('credit')).notEmpty().withMessage('Customer name is required for credit transactions'),
   body('customerPhone').if(body('mode').equals('credit')).notEmpty().withMessage('Customer phone is required for credit transactions')
+];
+
+// Middleware to validate transaction data for updates (more flexible)
+const validateTransactionUpdate = [
+  body('amount').optional().isNumeric().withMessage('Amount must be a number'),
+  body('mode').optional().custom((value, { req }) => {
+    if (value !== undefined && value !== null && value !== '') {
+      if (!['cash', 'upi', 'credit'].includes(value)) {
+        throw new Error('Invalid payment mode');
+      }
+    }
+    return true;
+  }),
+  body('customerName').optional(),
+  body('customerPhone').optional(),
+  body('description').optional(),
+  body('type').optional().isIn(['income', 'expense']).withMessage('Invalid transaction type'),
+  body('date').optional(),
+  body('userId').optional(),
+  body('_id').optional(),
+  body('__v').optional()
 ];
 
 // Get all transactions for a user
@@ -90,26 +111,29 @@ router.post('/', auth, async (req, res) => {
 });
 
 // Update transaction
-router.put('/:id', auth, validateTransaction, async (req, res) => {
+router.put('/:id', auth, validateTransactionUpdate, async (req, res) => {
   try {
+    console.log('Update request body:', req.body);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
-    //console.log(req.params.id, req.user.id)
+    
     const transaction = await Transaction.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
       req.body,
-      { new: true },
-      
+      { new: true }
     );
 
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
 
+    console.log('Updated transaction:', transaction);
     res.json(transaction);
   } catch (error) {
+    console.error('Update error:', error);
     res.status(500).json({ message: error.message });
   }
 });

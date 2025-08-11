@@ -114,8 +114,9 @@ export default function DashboardPage() {
         body: JSON.stringify({
           amount: (parseFloat(expenseData.amount)),
           type: 'expense',
+          mode: 'cash', // Default mode for expenses
           customerName: expenseData.customerName,
-          descrption: expenseData.description,
+          description: expenseData.description,
           customerPhone: expenseData.customerPhone,
         }),
       });
