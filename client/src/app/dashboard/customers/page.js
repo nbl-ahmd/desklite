@@ -117,7 +117,7 @@ export default function CustomersPage() {
             </div>
           </div>
           <p className="text-2xl font-black text-rose-600">₹{receivables.total.toLocaleString('en-IN')}</p>
-          <p className="text-xs font-bold text-rose-400 uppercase tracking-wider">To Receive (Lena)</p>
+          <p className="text-xs font-bold text-rose-400 uppercase tracking-wider">Receivables</p>
         </div>
       </div>
 
@@ -153,7 +153,7 @@ export default function CustomersPage() {
                 : 'bg-white border border-slate-100 text-slate-500'
             }`}
           >
-            Lena ({receivables.count})
+            Receivables ({receivables.count})
           </button>
         </div>
       </div>

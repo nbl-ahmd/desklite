@@ -28,10 +28,10 @@ const translations = {
     dailyCollection: 'Daily Collection',
     
     // Khata Terms (Kerala Style - using local terms instead of Hindi)
-    lena: 'Kittanullathu', // കിട്ടാനുള്ളത് - To Receive
-    dena: 'Kodukkanullathu', // കൊടുക്കാനുള്ളത് - To Pay
-    toReceive: 'To Receive',
-    toPay: 'To Pay',
+    lena: 'Receivables',
+    dena: 'Payables',
+    toReceive: 'Receivables',
+    toPay: 'Payables',
     totalReceivables: 'Total Receivables',
     totalPayables: 'Total Payables',
     pendingAmount: 'Pending Amount',

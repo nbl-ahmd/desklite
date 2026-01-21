@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ArrowDownCircle, MessageCircle, ChevronRight } from 'lucide-react';
 import { getApiToken } from '@/utils/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { ArrowDownCircle, ArrowUpCircle, Users, Phone, MessageCircle, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
 import WhatsAppReminderModal from './WhatsAppReminderModal';
 
-export default function LenaDenaWidget() {
+export default function ReceivablesWidget() {
   const { t, language } = useLanguage();
   const [receivables, setReceivables] = useState({ customers: [], total: 0, count: 0 });
   const [loading, setLoading] = useState(true);
@@ -58,18 +58,16 @@ export default function LenaDenaWidget() {
   }
 
   if (receivables.count === 0) {
-    return null; // Don't show if no receivables
+    return null;
   }
 
   const topCustomers = receivables.customers.slice(0, 3);
 
   return (
     <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-      {/* Background decoration */}
       <div className="absolute right-[-30px] top-[-30px] w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
       
       <div className="relative z-10">
-        {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -77,13 +75,12 @@ export default function LenaDenaWidget() {
             </div>
             <div>
               <h3 className="font-bold text-white/80 text-sm uppercase tracking-wider">
-                {t('toReceive')} ({t('lena')})
+                {t('toReceive')}
               </h3>
             </div>
           </div>
         </div>
 
-        {/* Total Amount */}
         <p className="text-4xl font-black mb-1">₹{receivables.total.toLocaleString('en-IN')}</p>
         <p className="text-rose-200 text-sm font-medium mb-5">
           {language === 'ml' 
@@ -92,7 +89,6 @@ export default function LenaDenaWidget() {
           }
         </p>
 
-        {/* Top Customers */}
         <div className="space-y-2">
           {topCustomers.map((customer) => (
             <div 
@@ -122,7 +118,6 @@ export default function LenaDenaWidget() {
           ))}
         </div>
 
-        {/* View All Link */}
         {receivables.count > 3 && (
           <Link 
             href="/dashboard/customers?tab=receivables"
@@ -137,7 +132,6 @@ export default function LenaDenaWidget() {
         )}
       </div>
 
-      {/* WhatsApp Reminder Modal */}
       <WhatsAppReminderModal
         isOpen={showReminderModal}
         onClose={() => {

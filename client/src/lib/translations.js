@@ -32,8 +32,8 @@ const translations = {
     paymentMethod: 'Payment Method',
     
     // Customer/Khata
-    toReceive: 'To Receive (Lena)',
-    toPay: 'To Pay (Dena)',
+    toReceive: 'Receivables',
+    toPay: 'Payables',
     totalCustomers: 'Total Customers',
     overdueBy: 'Overdue by',
     days: 'days',
@@ -93,8 +93,8 @@ const translations = {
     paymentMethod: 'പേയ്മെന്റ് രീതി',
     
     // Customer/Khata
-    toReceive: 'കിട്ടാനുള്ളത് (ലേന)',
-    toPay: 'കൊടുക്കാനുള്ളത് (ദേന)',
+    toReceive: 'കിട്ടാനുള്ളത്',
+    toPay: 'കൊടുക്കാനുള്ളത്',
     totalCustomers: 'ആകെ കസ്റ്റമേഴ്സ്',
     overdueBy: 'കാലഹരണപ്പെട്ടത്',
     days: 'ദിവസങ്ങൾ',

@@ -2,8 +2,11 @@ const QRCode = require('qrcode');
 
 // UPI QR Code generator
 async function generateUPIQR(upiId, amount, name, note = 'Payment') {
-  // UPI deep link format
-  const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+  // Ensure amount has 2 decimal places (required by some UPI apps)
+  const formattedAmount = parseFloat(amount).toFixed(2);
+  
+  // UPI deep link format - specific parameter ordering helps compatibility
+  const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name)}&am=${formattedAmount}&cu=INR&tn=${encodeURIComponent(note)}`;
   
   const qrDataUrl = await QRCode.toDataURL(upiLink, {
     width: 200,
@@ -68,68 +71,94 @@ async function generateReminderImage(options) {
 
   const t = texts[language] || texts.en;
 
-  // Create SVG
+  // Create SVG optimized for WhatsApp (1200x630 landscape)
+  // Modern Clean Professional Design - High Visibility Version
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
       <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#1e3a5f"/>
-          <stop offset="100%" style="stop-color:#0f172a"/>
+        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#020617"/>
+          <stop offset="100%" style="stop-color:#1e293b"/>
         </linearGradient>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+          <feOffset dx="0" dy="8" result="offsetblur"/>
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.4"/>
+          </feComponentTransfer>
+          <feMerge> 
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/> 
+          </feMerge>
+        </filter>
+        <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1.5" fill="#ffffff" fill-opacity="0.05"/>
+        </pattern>
       </defs>
       
       <!-- Background -->
-      <rect width="600" height="800" fill="url(#bg)"/>
+      <rect width="1200" height="630" fill="url(#bgGradient)"/>
+      <rect width="1200" height="630" fill="url(#grid)"/>
       
-      <!-- Header accent -->
-      <rect width="600" height="8" fill="#f97316"/>
+      <!-- Decorative Elements -->
+      <circle cx="1150" cy="50" r="400" fill="#22c55e" fill-opacity="0.03"/>
+      <circle cx="50" cy="580" r="300" fill="#3b82f6" fill-opacity="0.03"/>
+      <rect width="1200" height="12" fill="#22c55e"/>
       
-      <!-- Shop name -->
-      <text x="300" y="60" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">${escapeXml(shopName)}</text>
+      <!-- Left Content Container -->
+      <g transform="translate(100, 100)">
+         <!-- Shop Name -->
+         <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="36" font-weight="700" fill="#e2e8f0" letter-spacing="1">${escapeXml(shopName).toUpperCase()}</text>
+         
+         <line x1="0" y1="30" x2="550" y2="30" stroke="#334155" stroke-width="2"/>
+
+         <!-- Title -->
+         <text x="0" y="80" font-family="'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="500" fill="#94a3b8" letter-spacing="2" text-transform="uppercase">${t.reminder}</text>
+         
+         <!-- Customer Name (Larger) -->
+         <text x="0" y="140" font-family="'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" fill="white" style="text-shadow: 0 4px 12px rgba(0,0,0,0.3)">${escapeXml(customerName || 'Customer')}</text>
+         
+         <!-- Amount Section (Much Larger) -->
+         <g transform="translate(0, 240)">
+            <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="500" fill="#cbd5e1">${t.amountDue}</text>
+            <text x="0" y="90" font-family="'Segoe UI', Roboto, sans-serif" font-size="110" font-weight="900" fill="#4ade80" style="text-shadow: 0 4px 20px rgba(34, 197, 94, 0.4)">${formattedAmount}</text>
+         </g>
+
+         <!-- Due Date Badge -->
+         ${dateStr ? `
+         <g transform="translate(0, 380)">
+            <rect x="0" y="0" width="300" height="48" rx="12" fill="#ea580c" fill-opacity="0.15"/>
+            <text x="16" y="32" font-family="'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#fb923c">📅 ${t.dueLabel} ${dateStr}</text>
+         </g>
+         ` : ''}
+
+         <!-- Footer Contact -->
+         <g transform="translate(0, 500)">
+             <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="20" fill="#94a3b8">${t.footer}</text>
+             ${shopPhone ? `<text x="0" y="35" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#64748b">${t.contact} ${shopPhone}</text>` : ''}
+         </g>
+      </g>
       
-      <!-- Subtitle -->
-      <text x="300" y="90" font-family="Arial, sans-serif" font-size="16" fill="#94a3b8" text-anchor="middle">${t.reminder}</text>
-      
-      <!-- Divider -->
-      <line x1="40" y1="120" x2="560" y2="120" stroke="#334155" stroke-width="1"/>
-      
-      <!-- Customer label -->
-      <text x="40" y="160" font-family="Arial, sans-serif" font-size="14" fill="#64748b">${t.customer}</text>
-      
-      <!-- Customer name -->
-      <text x="40" y="190" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white">${escapeXml(customerName || 'Customer')}</text>
-      
-      <!-- Amount label -->
-      <text x="40" y="240" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#f97316">${t.amountDue}</text>
-      
-      <!-- Amount -->
-      <text x="40" y="300" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white">${formattedAmount}</text>
-      
-      <!-- Due date -->
-      ${dateStr ? `<text x="40" y="340" font-family="Arial, sans-serif" font-size="14" fill="#ef4444">${t.dueLabel} ${dateStr}</text>` : ''}
-      
-      <!-- QR Section -->
+      <!-- Right Section: QR Card -->
       ${qrDataUrl ? `
-        <text x="300" y="400" font-family="Arial, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${t.scanToPay}</text>
-        
-        <!-- QR Background -->
-        <rect x="200" y="415" width="200" height="200" rx="12" fill="white"/>
-        
-        <!-- QR Code (placeholder - actual QR needs client-side rendering) -->
-        <image href="${qrDataUrl}" x="210" y="425" width="180" height="180"/>
-        
-        <!-- UPI ID -->
-        <text x="300" y="645" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">${escapeXml(upiId)}</text>
+        <g transform="translate(780, 80)" filter="url(#shadow)">
+          <rect x="0" y="0" width="340" height="470" rx="32" fill="white"/>
+          
+          <g transform="translate(170, 50)">
+             <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="800" fill="#0f172a">${t.scanToPay}</text>
+          </g>
+          
+          <!-- QR Code Image -->
+          <image href="${qrDataUrl}" x="35" y="85" width="270" height="270"/>
+          
+          <g transform="translate(170, 400)">
+            <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#64748b" font-weight="500">${escapeXml(upiId)}</text>
+            <g transform="translate(0, 40)">
+                <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#94a3b8">${t.poweredBy}</text>
+            </g>
+          </g>
+        </g>
       ` : ''}
-      
-      <!-- Footer message -->
-      <text x="300" y="720" font-family="Arial, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">${t.footer}</text>
-      
-      <!-- Contact -->
-      ${shopPhone ? `<text x="300" y="750" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">${t.contact} ${shopPhone}</text>` : ''}
-      
-      <!-- Powered by -->
-      <text x="300" y="780" font-family="Arial, sans-serif" font-size="10" fill="#475569" text-anchor="middle">${t.poweredBy}</text>
     </svg>
   `;
 

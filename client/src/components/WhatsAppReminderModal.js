@@ -35,9 +35,13 @@ export default function WhatsAppReminderModal({
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [reminderImage, setReminderImage] = useState(null);
   const [qrCode, setQrCode] = useState(null);
+  const [paymentLink, setPaymentLink] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
+  const [upiIdResp, setUpiIdResp] = useState('');
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [phone, setPhone] = useState('');
   const [includeImage, setIncludeImage] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
   const [upiConfigured, setUpiConfigured] = useState(true);
@@ -46,7 +50,11 @@ export default function WhatsAppReminderModal({
 
   useEffect(() => {
     if (isOpen && customer) {
+      const customerPhone = customer.phone || customer.customerPhone || '';
+      setPhone(customerPhone);
       generateMessage();
+      // Auto-generate the branded card when modal opens
+      generateImage();
     }
   }, [isOpen, customer, selectedTemplate, messageLanguage]);
 
@@ -106,9 +114,19 @@ export default function WhatsAppReminderModal({
 
       if (res.ok) {
         const data = await res.json();
-        // Store the QR code as the preview image since full image generation is complex
-        setReminderImage(data.qr);
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+        const fallbackPayment = (!data.paymentLink && data.upiId)
+          ? `upi://pay?pa=${encodeURIComponent(data.upiId)}&pn=${encodeURIComponent(data.shopName || 'Shop')}&am=${encodeURIComponent(customer.balance || customer.amount || 0)}&cu=INR`
+          : data.paymentLink;
+        const fallbackShare = data.shareUrl || (apiBase && data.upiId
+          ? `${apiBase}/api/reminders/share-card?customerName=${encodeURIComponent(customer._id || customer.customerName || customer.name)}&amount=${encodeURIComponent(customer.balance || customer.amount || 0)}&dueDate=${encodeURIComponent(customer.dueDate || customer.lastDueDate || '')}&language=${messageLanguage}&shopName=${encodeURIComponent(data.shopName || 'Shop')}&shopPhone=${encodeURIComponent(data.shopPhone || '')}&upiId=${encodeURIComponent(data.upiId)}`
+          : '');
+
+        setReminderImage(data.image || data.qr);
         setQrCode(data.qr);
+        setPaymentLink(fallbackPayment || '');
+        setShareUrl(fallbackShare);
+        setUpiIdResp(data.upiId || '');
         setUpiConfigured(true);
       } else {
         const error = await res.json();
@@ -139,9 +157,9 @@ export default function WhatsAppReminderModal({
   };
 
   const sendWhatsApp = async () => {
-    const phone = customer.phone || customer.customerPhone;
-    if (!phone) {
-      alert(language === 'ml' ? 'ഫോൺ നമ്പർ ഇല്ല' : 'No phone number available');
+    const targetPhone = phone || customer.phone || customer.customerPhone;
+    if (!targetPhone) {
+      alert(language === 'ml' ? 'ഫോൺ നമ്പർ ചേർക്കുക' : 'Please enter a phone number');
       return;
     }
 
@@ -162,24 +180,13 @@ export default function WhatsAppReminderModal({
       });
 
       // Format phone number
-      const cleanPhone = phone.replace(/\D/g, '');
+      const cleanPhone = targetPhone.replace(/\D/g, '');
       const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
       
-      // Open WhatsApp with message
-      const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(generatedMessage)}`;
+      // Open WhatsApp (api.whatsapp works on mobile/PWA)
+      const linkPart = shareUrl ? `\n\nPay here: ${shareUrl}` : (paymentLink ? `\n\nPay via UPI: ${paymentLink}` : '');
+      const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(`${generatedMessage}${linkPart}`)}`;
       window.open(whatsappUrl, '_blank');
-
-      // If image was generated, show instructions
-      if (reminderImage) {
-        // Download image for manual attachment
-        downloadImage();
-        setTimeout(() => {
-          alert(language === 'ml' 
-            ? 'ചിത്രം ഡൗൺലോഡ് ചെയ്തു. WhatsApp-ൽ ചേർക്കുക.' 
-            : 'Image downloaded. Please attach it in WhatsApp.'
-          );
-        }, 500);
-      }
 
       onSent?.();
       onClose();
@@ -228,6 +235,25 @@ export default function WhatsAppReminderModal({
             <p className="text-3xl font-black text-rose-700">
               ₹{amount.toLocaleString('en-IN')}
             </p>
+          </div>
+
+          {/* Phone Entry (for WhatsApp) */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700">
+              {language === 'ml' ? 'ഫോൺ നമ്പർ (WhatsApp)' : 'Phone (WhatsApp)'}
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={language === 'ml' ? 'ഫോൺ നമ്പർ നൽകുക' : 'Enter phone number'}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-green-500/30 outline-none"
+            />
+            {!phone && (
+              <p className="text-xs text-amber-600 font-semibold">
+                {language === 'ml' ? 'WhatsApp അയയ്ക്കാൻ ഫോൺ ആവശ്യമാണ്' : 'Phone is required to send WhatsApp'}
+              </p>
+            )}
           </div>
 
           {/* Language Toggle */}
@@ -325,7 +351,7 @@ export default function WhatsAppReminderModal({
               <div className="flex items-center gap-2">
                 <Image className="w-5 h-5 text-blue-600" />
                 <span className="font-bold text-slate-700">
-                  {language === 'ml' ? 'QR കോഡ് ഉള്ള ചിത്രം' : 'Image with QR Code'}
+                  {language === 'ml' ? 'ബ്രാൻഡഡ് പേയ്‌മെന്റ് കാർഡ്' : 'Branded payment card'}
                 </span>
               </div>
               <button
@@ -348,27 +374,95 @@ export default function WhatsAppReminderModal({
             )}
 
             {reminderImage && (
-              <div className="space-y-2">
-                <div className="bg-white rounded-xl p-4 text-center">
-                  <p className="text-xs font-bold text-slate-500 mb-2">
-                    {language === 'ml' ? 'പണം അടയ്ക്കാൻ സ്കാൻ ചെയ്യുക' : 'Scan to Pay'}
+              <div className="space-y-3">
+                <div className="bg-white rounded-xl p-3 text-center space-y-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {language === 'ml' ? 'പ്രിവ്യൂ' : 'Preview (WhatsApp optimized 1200×630)'}
                   </p>
                   <img 
                     src={reminderImage} 
-                    alt="UPI QR Code" 
-                    className="w-40 h-40 mx-auto"
+                    alt="Payment Reminder" 
+                    className="w-full rounded-lg border border-slate-100 aspect-[1200/630] object-cover"
                   />
-                  <p className="text-lg font-bold text-slate-800 mt-2">
-                    ₹{(customer?.balance || customer?.amount || 0).toLocaleString('en-IN')}
-                  </p>
                 </div>
-                <button
-                  onClick={downloadImage}
-                  className="w-full py-2 bg-white text-blue-600 font-bold text-sm rounded-xl hover:bg-blue-50 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  {language === 'ml' ? 'QR ഡൗൺലോഡ്' : 'Download QR'}
-                </button>
+                
+                {/* Share link with preview */}
+                {shareUrl && (
+                  <div className="bg-green-50 rounded-xl p-3 space-y-2 border border-green-100">
+                    <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider">
+                      {language === 'ml' ? 'പേയ്മെന്റ് പേജ് ലിങ്ക്' : 'Payment Page Link'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={shareUrl} 
+                        readOnly 
+                        className="flex-1 text-xs font-mono bg-white border border-green-200 rounded-lg px-2 py-2 text-slate-700 truncate"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(shareUrl);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="p-2 bg-white border border-green-200 rounded-lg text-green-700 hover:bg-green-50 flex-shrink-0"
+                        title="Copy"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => window.open(shareUrl, '_blank')}
+                        className="flex-1 py-2 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700"
+                      >
+                        {language === 'ml' ? 'പേജ് തുറക്കുക' : 'Open Page'}
+                      </button>
+                      <button
+                        onClick={downloadImage}
+                        className="flex-1 py-2 bg-white border border-green-200 text-green-700 rounded-lg text-xs font-bold hover:bg-green-50 flex items-center justify-center gap-1"
+                      >
+                        <Download className="w-3 h-3" />
+                        {language === 'ml' ? 'ഡൗൺലോഡ്' : 'Download'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Direct UPI link fallback */}
+                {paymentLink && !shareUrl && (
+                  <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      {language === 'ml' ? 'UPI ലിങ്ക്' : 'Direct UPI Link'}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={paymentLink} 
+                        readOnly 
+                        className="flex-1 text-xs font-mono bg-white border border-slate-200 rounded-lg px-2 py-2 text-slate-700 truncate"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentLink);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 flex-shrink-0"
+                        title="Copy"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <button
+                      onClick={downloadImage}
+                      className="w-full py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-100 flex items-center justify-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />
+                      {language === 'ml' ? 'ചിത്രം ഡൗൺലോഡ്' : 'Download Image'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -392,8 +486,8 @@ export default function WhatsAppReminderModal({
           </button>
           <p className="text-xs text-center text-slate-400 mt-2">
             {language === 'ml' 
-              ? 'ചിത്രം WhatsApp-ൽ മാനുവലായി ചേർക്കുക' 
-              : 'Attach the downloaded image manually in WhatsApp'}
+              ? 'ലിങ്ക് മെസേജിൽ ഉൾപ്പെടുത്തും' 
+              : 'Link will be included in the message'}
           </p>
         </div>
       </div>
