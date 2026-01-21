@@ -11,6 +11,9 @@ const { registerJobs } = require('./jobs');
 
 const app = express();
 
+// Respect proxy headers (Render/NGINX) so rate-limit & auth get real client IPs
+app.set('trust proxy', 1);
+
 // =============================================================================
 // ENVIRONMENT VALIDATION
 // =============================================================================
