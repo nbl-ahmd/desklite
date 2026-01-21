@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "nodemon src/index.js",
+    "build": "echo 'no build step for server'",
     "start": "node src/index.js",
     "start:prod": "NODE_ENV=production node src/index.js"
   },
@@ -25,7 +26,8 @@
     "puppeteer": "^24.20.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.34.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "web-push": "^3.6.6"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"

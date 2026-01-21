@@ -176,7 +176,7 @@ router.get('/outstanding', auth, async (req, res) => {
   try {
     const now = new Date();
     const pipeline = [
-      { $match: { shopId: new mongoose.Types.ObjectId(req.user.shopId) } },
+      { $match: { shopId: new mongoose.Types.ObjectId(req.user.shopId), mode: 'credit', isPaid: false, type: { $ne: 'expense' } } },
       { $addFields: { signedAmount: { $cond: [{ $in: ['$eventType', ['payment', 'expense']] }, { $multiply: ['$amount', -1] }, '$amount'] } } },
       { $group: {
           _id: '$customerName',

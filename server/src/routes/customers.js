@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
     const shopId = toObjectId(req.user.shopId);
     
     const customers = await Transaction.aggregate([
-      { $match: { shopId: shopId, customerName: { $exists: true, $nin: [null, ''] } } },
+      { $match: { shopId: shopId, customerName: { $exists: true, $nin: [null, ''] }, type: { $ne: 'expense' } } },
       {
         $group: {
           _id: '$customerName',
@@ -74,6 +74,8 @@ router.get('/receivables', async (req, res) => {
         $match: { 
           shopId: shopId, 
           mode: 'credit',
+          type: { $ne: 'expense' },
+          isPaid: false,
           customerName: { $exists: true, $ne: null, $ne: '' }
         } 
       },
@@ -118,6 +120,65 @@ router.get('/receivables', async (req, res) => {
   } catch (error) {
     console.error('Error fetching receivables:', error);
     res.status(500).json({ error: 'Failed to fetch receivables' });
+  }
+});
+
+// Get vendor payables (what the shop owes to suppliers/vendors)
+router.get('/payables', async (req, res) => {
+  try {
+    const shopId = toObjectId(req.user.shopId);
+
+    const payables = await Transaction.aggregate([
+      {
+        $match: {
+          shopId: shopId,
+          mode: 'credit',
+          type: 'expense',
+          isPaid: false,
+          customerName: { $exists: true, $ne: null, $ne: '' }
+        }
+      },
+      {
+        $group: {
+          _id: '$customerName',
+          phone: { $first: '$customerPhone' },
+          totalPayable: { $sum: '$amount' },
+          transactionCount: { $sum: 1 },
+          lastTransaction: { $max: '$date' },
+          oldestDue: { $min: '$dueDate' }
+        }
+      },
+      { $match: { totalPayable: { $gt: 0 } } },
+      {
+        $project: {
+          _id: 0,
+          name: '$_id',
+          phone: 1,
+          amount: '$totalPayable',
+          transactionCount: 1,
+          lastTransaction: 1,
+          oldestDue: 1,
+          daysSinceOldest: {
+            $divide: [
+              { $subtract: [new Date(), '$oldestDue'] },
+              1000 * 60 * 60 * 24
+            ]
+          }
+        }
+      },
+      { $sort: { amount: -1 } }
+    ]);
+
+    const totalPayable = payables.reduce((sum, r) => sum + r.amount, 0);
+
+    res.json({
+      vendors: payables,
+      total: totalPayable,
+      count: payables.length
+    });
+  } catch (error) {
+    console.error('Error fetching payables:', error);
+    res.status(500).json({ error: 'Failed to fetch payables' });
   }
 });
 

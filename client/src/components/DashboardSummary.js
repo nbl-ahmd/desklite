@@ -24,37 +24,33 @@ export default function DashboardSummary() {
       const session = await getSession();
       const token = session?.apiToken;
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [quickRes, dailyRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/summary/quick`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/summary/daily`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
 
-      if (!response.ok) throw new Error('Failed to fetch');
+      if (!quickRes.ok) throw new Error('Failed to fetch quick summary');
+      const quick = await quickRes.json();
 
-      const transactions = await response.json();
-      
-      const today = new Date().toDateString();
-      let income = 0, expense = 0, todayInc = 0, todayExp = 0;
-
-      transactions.forEach(t => {
-        const amt = parseFloat(t.amount) || 0;
-        const isToday = new Date(t.date).toDateString() === today;
-
-        if (t.type === 'income') {
-          income += amt;
-          if (isToday) todayInc += amt;
-        } else {
-          expense += amt;
-          if (isToday) todayExp += amt;
-        }
-      });
+      let todayIncome = 0;
+      let todayExpense = 0;
+      if (dailyRes.ok) {
+        const daily = await dailyRes.json();
+        todayIncome = daily.income || 0;
+        todayExpense = daily.expense || 0;
+      }
 
       setStats({
-        totalIncome: income,
-        totalExpense: expense,
-        balance: income - expense,
-        todayIncome: todayInc,
-        todayExpense: todayExp,
-        transactionCount: transactions.length
+        totalIncome: quick.totalIncome || 0,
+        totalExpense: quick.totalExpense || 0,
+        balance: quick.balance || 0,
+        todayIncome,
+        todayExpense,
+        transactionCount: undefined
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);

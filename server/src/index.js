@@ -42,7 +42,7 @@ app.use(helmet({
 // Rate limiting for API
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 300 : 2000,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -112,10 +112,12 @@ const connectWithRetry = async (retries = 5, delay = 5000) => {
 // =============================================================================
 // ROUTES
 // =============================================================================
-// Apply rate limiting
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api', apiLimiter);
+// Apply rate limiting (relaxed in non-production)
+if (process.env.RATE_LIMIT_DISABLE !== 'true') {
+  app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/register', authLimiter);
+  app.use('/api', apiLimiter);
+}
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/transactions', require('./routes/transactions'));
@@ -128,6 +130,7 @@ app.use('/api/ledger', require('./routes/ledger'));
 app.use('/api/summary', require('./routes/summary'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/reminders', require('./routes/reminders'));
+app.use('/api/push', require('./routes/push'));
 
 app.get('/health', (req, res) => {
   const dbState = mongoose.connection.readyState;

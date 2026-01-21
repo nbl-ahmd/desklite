@@ -130,7 +130,7 @@ router.get('/total', async (req, res) => {
 // Create a new transaction
 router.post('/', async (req, res) => {
   try {
-    const { amount, mode, customerName, customerPhone, description, type } = req.body;
+    const { amount, mode, customerName, customerPhone, description, type, dueDate } = req.body;
     //console.log(req.body);
     console.log('req from transaction  route', req.body);
     //console.log('req from transaction  route', req.user);
@@ -151,17 +151,23 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const txnMode = mode || 'cash';
+    const isCredit = txnMode === 'credit';
+
     const transaction = new Transaction({
       shopId: toObjectId(req.user.shopId),
       userId: req.user.id,
       amount,
       type,
-      mode: type === 'income' ? mode : undefined,
+      mode: txnMode,
       customerName,
       customerPhone,
       description,
       date: new Date(),
-      occurredAt: new Date()
+      occurredAt: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      // For credit (including expense to vendors), ensure it remains unpaid until settled
+      isPaid: isCredit ? false : undefined
     });
 
     await transaction.save();
@@ -203,6 +209,82 @@ router.put('/:id', validateTransactionUpdate, async (req, res) => {
   } catch (error) {
     console.error('Update error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark credit transactions for a customer/vendor as paid
+router.post('/mark-paid', async (req, res) => {
+  try {
+    const { customerName, kind = 'customer' } = req.body || {};
+
+    if (!customerName) {
+      return res.status(400).json({ error: 'customerName is required' });
+    }
+
+    // Vendors: just close unpaid credit expenses
+    if (kind === 'vendor') {
+      const result = await Transaction.updateMany(
+        {
+          shopId: toObjectId(req.user.shopId),
+          customerName,
+          mode: 'credit',
+          type: 'expense',
+          isPaid: false
+        },
+        { $set: { isPaid: true } }
+      );
+
+      return res.json({ updated: result.modifiedCount, createdPayment: false, kind });
+    }
+
+    // Customers: create a payment entry to offset balance and mark credit tx as paid
+    const match = {
+      shopId: toObjectId(req.user.shopId),
+      customerName,
+      mode: 'credit',
+      type: { $ne: 'expense' },
+      isPaid: false
+    };
+
+    const [creditTx] = await Transaction.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$customerName',
+          total: { $sum: '$amount' },
+          phone: { $first: '$customerPhone' }
+        }
+      }
+    ]);
+
+    if (!creditTx || creditTx.total <= 0) {
+      return res.json({ updated: 0, createdPayment: false, kind });
+    }
+
+    // Mark existing credit as paid
+    const updated = await Transaction.updateMany(match, { $set: { isPaid: true } });
+
+    // Insert payment event to offset balance in ledger
+    const payment = new Transaction({
+      shopId: toObjectId(req.user.shopId),
+      userId: req.user.id,
+      amount: creditTx.total,
+      eventType: 'payment',
+      type: 'expense',
+      mode: 'cash',
+      customerName,
+      customerPhone: creditTx.phone,
+      description: 'Marked paid (manual)',
+      isPaid: true,
+      date: new Date(),
+      occurredAt: new Date()
+    });
+    await payment.save();
+
+    res.json({ updated: updated.modifiedCount, createdPayment: true, kind });
+  } catch (error) {
+    console.error('Error marking transactions paid:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

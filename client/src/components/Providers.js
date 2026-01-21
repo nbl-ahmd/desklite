@@ -4,6 +4,7 @@ import { SessionProvider } from 'next-auth/react';
 import { SyncProvider } from '@/contexts/SyncContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
 
 export default function Providers({ children }) {
   return (
@@ -11,7 +12,9 @@ export default function Providers({ children }) {
       <LanguageProvider>
         <SubscriptionProvider>
           <SyncProvider>
-            {children}
+            <NotificationsProvider>
+              {children}
+            </NotificationsProvider>
           </SyncProvider>
         </SubscriptionProvider>
       </LanguageProvider>

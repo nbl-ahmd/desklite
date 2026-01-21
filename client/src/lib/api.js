@@ -76,6 +76,7 @@ export const transactions = {
   create: (data) => api.post('/transactions', data),
   list: (params) => api.get('/transactions', { params }),
   update: (id, data) => api.put(`/transactions/${id}`, data),
+  markPaid: (payload) => api.post('/transactions/mark-paid', payload),
   delete: (id) => api.delete(`/transactions/${id}`),
   total: () => api.get('/transactions/total'),
 };

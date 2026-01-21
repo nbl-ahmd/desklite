@@ -24,19 +24,24 @@ export default function QuickTransactionForm({ onSuccess }) {
   const { enqueueOfflineTransaction, isOnline, syncNow } = useSync();
 
   useEffect(() => {
-    // Load recent names from localStorage
-    const recent = JSON.parse(localStorage.getItem('recentNames') || '[]');
-    setRecentNames(recent);
-    
+    // Load recent names bucketed by type (customers for income, vendors for expense)
+    const loadRecent = () => {
+      const key = type === 'expense' ? 'recentVendorNames' : 'recentCustomerNames';
+      const recent = JSON.parse(localStorage.getItem(key) || '[]');
+      setRecentNames(recent);
+    };
+
+    loadRecent();
     // Focus amount field on mount for quick entry
     setTimeout(() => amountRef.current?.focus(), 100);
-  }, []);
+  }, [type]);
 
   const saveRecentName = (name) => {
     if (!name || name.trim() === '') return;
-    const recent = JSON.parse(localStorage.getItem('recentNames') || '[]');
+    const key = type === 'expense' ? 'recentVendorNames' : 'recentCustomerNames';
+    const recent = JSON.parse(localStorage.getItem(key) || '[]');
     const updated = [name, ...recent.filter(n => n !== name)].slice(0, 10);
-    localStorage.setItem('recentNames', JSON.stringify(updated));
+    localStorage.setItem(key, JSON.stringify(updated));
     setRecentNames(updated);
   };
 
@@ -201,7 +206,7 @@ export default function QuickTransactionForm({ onSuccess }) {
         <div className="space-y-4">
           <Input 
             icon={User}
-            placeholder="Customer Name"
+            placeholder={type === 'expense' ? 'Vendor / Merchant Name' : 'Customer Name'}
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             list="recent-names"
@@ -209,7 +214,7 @@ export default function QuickTransactionForm({ onSuccess }) {
           />
           <datalist id="recent-names">
             {recentNames.map((name, i) => (
-              <option key={i} value={name} />
+              <option key={`${type}-${i}`} value={name} />
             ))}
           </datalist>
 

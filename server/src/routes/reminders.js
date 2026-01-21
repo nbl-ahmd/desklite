@@ -599,6 +599,7 @@ router.get('/overdue', async (req, res) => {
     const overdue = await Transaction.find({
       shopId,
       mode: 'credit',
+      type: { $ne: 'expense' }, // only what customers owe you
       isPaid: false,
       dueDate: { $lt: today }
     }).sort({ dueDate: 1 });
@@ -625,6 +626,68 @@ router.get('/overdue', async (req, res) => {
   }
 });
 
+// GET /api/reminders/payables/overdue - overdue vendor payables (credit expenses)
+router.get('/payables/overdue', async (req, res) => {
+  try {
+    const shopId = toObjectId(req.user.shopId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const overdue = await Transaction.find({
+      shopId,
+      mode: 'credit',
+      type: 'expense',
+      isPaid: false,
+      dueDate: { $lt: today }
+    }).sort({ dueDate: 1 });
+
+    const result = overdue.map(tx => {
+      const dueDate = new Date(tx.dueDate);
+      const diffTime = today - dueDate;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return { ...tx.toObject(), daysOverdue: diffDays };
+    });
+
+    res.json({
+      count: result.length,
+      totalAmount: result.reduce((sum, tx) => sum + tx.amount, 0),
+      transactions: result
+    });
+  } catch (error) {
+    console.error('Error fetching payable overdue:', error);
+    res.status(500).json({ error: 'Failed to fetch payable overdue' });
+  }
+});
+
+// GET /api/reminders/payables/due-soon - vendor payables due in next 3 days
+router.get('/payables/due-soon', async (req, res) => {
+  try {
+    const shopId = toObjectId(req.user.shopId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const dueSoon = await Transaction.find({
+      shopId,
+      mode: 'credit',
+      type: 'expense',
+      isPaid: false,
+      dueDate: { $gte: today, $lte: threeDaysFromNow }
+    }).sort({ dueDate: 1 });
+
+    res.json({
+      count: dueSoon.length,
+      totalAmount: dueSoon.reduce((sum, tx) => sum + tx.amount, 0),
+      transactions: dueSoon
+    });
+  } catch (error) {
+    console.error('Error fetching payable due-soon:', error);
+    res.status(500).json({ error: 'Failed to fetch payable due soon' });
+  }
+});
+
 // GET /api/reminders/due-soon - Get transactions due within next 3 days
 router.get('/due-soon', async (req, res) => {
   try {
@@ -638,6 +701,7 @@ router.get('/due-soon', async (req, res) => {
     const dueSoon = await Transaction.find({
       shopId,
       mode: 'credit',
+      type: { $ne: 'expense' },
       isPaid: false,
       dueDate: { $gte: today, $lte: threeDaysFromNow }
     }).sort({ dueDate: 1 });

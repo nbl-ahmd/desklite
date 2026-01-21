@@ -16,6 +16,11 @@ const translations = {
     menu: 'Menu',
     overdue: 'Overdue',
     upgrade: 'Upgrade',
+    notificationsTitle: 'Notifications',
+    notificationsEmpty: 'You are all caught up',
+    markAllRead: 'Mark all read',
+    viewAllNotifications: 'View all notifications',
+    recent: 'Recent',
     
     // Dashboard
     todaySummary: "Today's Summary",
@@ -180,6 +185,11 @@ const translations = {
     menu: 'മെനു',
     overdue: 'കാലഹരണപ്പെട്ടത്',
     upgrade: 'അപ്ഗ്രേഡ്',
+    notificationsTitle: 'അറിയിപ്പുകൾ',
+    notificationsEmpty: 'എല്ലാം വായിച്ചു',
+    markAllRead: 'എല്ലാം വായിച്ചതായി അടയാളിക്കുക',
+    viewAllNotifications: 'എല്ലാ അറിയിപ്പുകളും കാണുക',
+    recent: 'സമീപകാലം',
     
     // Dashboard
     todaySummary: 'ഇന്നത്തെ സംഗ്രഹം',

@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../contexts/SubscriptionContext';
 import { useSync } from '@/contexts/SyncContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import InstallPrompt from './InstallPrompt';
 import OfflineBanner from './OfflineBanner';
 import ErrorBoundary from './ErrorBoundary';
-import Button from './Button';
+import PushRegistration from './PushRegistration';
 import { 
   Home, 
   Users, 
@@ -25,7 +26,9 @@ import {
   LogOut,
   Settings,
   Clock,
-  Sparkles
+  Sparkles,
+  Bell,
+  Check
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -35,6 +38,8 @@ export default function DashboardLayout({ children }) {
   const { subscription } = useSubscription();
   const { status: syncStatus, pendingCount } = useSync();
   const { t } = useLanguage();
+  const { alerts, unreadCount, markAsRead, markAllRead, loading: notifLoading, readIds } = useNotifications();
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   // Primary Navigation (Bottom Bar on Mobile)
   const mainNavHelp = [
@@ -52,9 +57,12 @@ export default function DashboardLayout({ children }) {
     { name: t('ledger'), href: '/dashboard/ledger', icon: BookOpen },
     { name: t('overdue'), href: '/dashboard/overdue', icon: Clock },
     { name: t('reports'), href: '/dashboard/reports', icon: BarChart3 },
+    { name: t('notificationsTitle'), href: '/dashboard/notifications', icon: Bell },
     { name: t('upgrade'), href: '/dashboard/upgrade', icon: Sparkles },
     { name: t('settings'), href: '/dashboard/settings', icon: Settings },
   ];
+
+  const recentAlerts = useMemo(() => alerts.slice(0, 5), [alerts]);
 
   const renderStatusIndicators = () => {
     return (
@@ -101,6 +109,7 @@ export default function DashboardLayout({ children }) {
       
       {/* 1. TOP BAR (Global Status) */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-40 px-4 flex items-center justify-between shadow-sm backdrop-blur-md bg-white/90">
+        <PushRegistration />
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
             <h1 className="text-xl font-black text-slate-900 leading-tight tracking-tight">
@@ -112,8 +121,71 @@ export default function DashboardLayout({ children }) {
           </div>
         </div>
         
-        <div>
+        <div className="flex items-center gap-3 relative">
           {renderStatusIndicators()}
+
+          {/* Notification bell */}
+          <button
+            onClick={() => setIsNotifOpen((prev) => !prev)}
+            className="relative p-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+            aria-label="Notifications"
+          >
+            <Bell size={18} className="text-slate-700" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {isNotifOpen && (
+            <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 animate-slideDown">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t('notificationsTitle')}</p>
+                  <p className="text-sm font-semibold text-slate-900">{notifLoading ? 'Loading...' : `${alerts.length} ${t('recent')}`}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href="/dashboard/notifications" className="text-xs font-bold text-blue-600 hover:text-blue-700">
+                    {t('viewAllNotifications')}
+                  </Link>
+                  <button
+                    onClick={markAllRead}
+                    className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
+                  >
+                    <Check size={14} />
+                    {t('markAllRead')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                {recentAlerts.length === 0 && (
+                  <div className="px-4 py-6 text-sm text-slate-500 text-center">{t('notificationsEmpty')}</div>
+                )}
+                {recentAlerts.map((alert) => {
+                  const isUnread = alert?.id ? !readIds.has(alert.id) : false;
+                  return (
+                    <div
+                      key={alert.id}
+                      className="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 cursor-pointer"
+                      onClick={() => markAsRead(alert.id)}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1 ${alert.type === 'vendor' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                          {alert.name}
+                          {isUnread && <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />}
+                        </p>
+                        <p className="text-xs text-slate-500">₹{Number(alert.amount).toLocaleString('en-IN')} • {alert.message}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{alert.dueDate ? new Date(alert.dueDate).toLocaleDateString('en-IN') : ''}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 

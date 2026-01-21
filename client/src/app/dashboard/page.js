@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getApiToken } from '@/utils/auth';
+import { useNotifications } from '@/contexts/NotificationsContext';
 import QuickTransactionForm from '@/components/QuickTransactionForm';
 import DashboardSummary from '@/components/DashboardSummary';
 import RecentTransactions from '@/components/RecentTransactions';
 import ReceivablesWidget from '@/components/ReceivablesWidget';
+import PayablesWidget from '@/components/PayablesWidget';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function DashboardPage() {
@@ -18,6 +20,8 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const [refreshKey, setRefreshKey] = useState(0);
   const [todayNet, setTodayNet] = useState({ income: 0, expense: 0, loading: true });
+  const { alerts } = useNotifications();
+  const notifiedRef = useRef(new Set());
 
   const todayRange = useMemo(() => {
     const start = new Date();
@@ -66,6 +70,28 @@ export default function DashboardPage() {
     if (status === 'authenticated') fetchToday();
   }, [status, refreshKey]);
 
+  useEffect(() => {
+    // Push notification (best effort) when new alerts arrive
+    const notify = async () => {
+      if (typeof window === 'undefined' || alerts.length === 0) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      const reg = await navigator.serviceWorker?.ready;
+      alerts.forEach((alert) => {
+        if (notifiedRef.current.has(alert.id)) return;
+        notifiedRef.current.add(alert.id);
+        const title = alert.type === 'vendor' ? 'Vendor due soon' : 'Customer due today';
+        const body = `${alert.name}: ₹${Number(alert.amount).toLocaleString('en-IN')}`;
+        if (reg?.showNotification) {
+          reg.showNotification(title, { body, tag: alert.id });
+        } else {
+          new Notification(title, { body, tag: alert.id });
+        }
+      });
+    };
+    if (status === 'authenticated') notify();
+  }, [alerts, status]);
+
   const handleTransactionSuccess = () => {
     // Trigger refresh of summary and recent transactions
     setRefreshKey(prev => prev + 1);
@@ -85,6 +111,35 @@ export default function DashboardPage() {
   return (
     <ErrorBoundary>
       <div className="space-y-6 pb-20">
+
+        {/* Alerts for due customers/vendors */}
+        {alerts.length > 0 && (
+          <div className="space-y-2">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className={`flex items-center justify-between px-4 py-3 rounded-2xl border shadow-sm ${
+                  alert.type === 'vendor'
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                    : 'bg-amber-50 border-amber-100 text-amber-800'
+                }`}
+              >
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold uppercase tracking-wide">
+                    {alert.type === 'vendor' ? 'Vendor payable' : 'Customer due'}
+                  </span>
+                  <span className="text-sm font-bold">
+                    {alert.name} • ₹{Number(alert.amount).toLocaleString('en-IN')}
+                  </span>
+                  <span className="text-xs font-semibold opacity-80">{alert.message}</span>
+                </div>
+                <div className="text-xs font-semibold opacity-70">
+                  {alert.dueDate ? new Date(alert.dueDate).toLocaleDateString('en-IN') : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Quick Add at top with modern minimal today stats */}
         <section className="space-y-4">
@@ -122,6 +177,7 @@ export default function DashboardPage() {
 
         {/* Rest of insights */}
         <ReceivablesWidget key={`receivables-${refreshKey}`} />
+        <PayablesWidget key={`payables-${refreshKey}`} />
         <DashboardSummary key={`summary-${refreshKey}`} />
 
         {/* Recent Activity */}

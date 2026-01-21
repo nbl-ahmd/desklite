@@ -59,6 +59,36 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Lightweight totals without fetching all transactions
+router.get('/quick', async (req, res) => {
+  try {
+    const shopId = toObjectId(req.user.shopId);
+
+    const [result] = await Transaction.aggregate([
+      { $match: { shopId } },
+      {
+        $group: {
+          _id: null,
+          totalIncome: { $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] } },
+          totalExpense: { $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] } }
+        }
+      }
+    ]);
+
+    const totalIncome = result?.totalIncome || 0;
+    const totalExpense = result?.totalExpense || 0;
+
+    res.json({
+      totalIncome,
+      totalExpense,
+      balance: totalIncome - totalExpense
+    });
+  } catch (error) {
+    console.error('Quick summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch quick summary' });
+  }
+});
+
 // Daily summary for dashboard
 router.get('/daily', async (req, res) => {
   try {

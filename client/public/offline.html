@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline • Desklite</title>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.1);
+      padding: 28px;
+      max-width: 420px;
+      width: 100%;
+      border: 1px solid #e2e8f0;
+    }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    p { margin: 4px 0 12px; line-height: 1.5; color: #475569; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .list { margin: 12px 0; padding-left: 18px; color: #334155; }
+    .list li { margin-bottom: 6px; }
+    .footer { font-size: 12px; color: #94a3b8; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="pill">Offline</div>
+    <h1>You're offline</h1>
+    <p>The latest saved data is available once you're back online. Reconnect to sync new transactions and reminders.</p>
+    <ul class="list">
+      <li>Check your connection and try again</li>
+      <li>Reopen the app after reconnecting</li>
+      <li>Use cached pages if available</li>
+    </ul>
+    <p class="footer">Desklite works offline for cached screens; full sync resumes when you're back.</p>
+  </div>
+</body>
+</html>
