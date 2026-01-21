@@ -1,12 +1,15 @@
 'use client';
 
-import { User, Bell, Shield, Lock, Smartphone, LogOut, ChevronRight, Globe } from 'lucide-react';
+import Link from 'next/link';
+import { User, Bell, Shield, Lock, Smartphone, LogOut, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import UpiQrWidget from '@/components/UpiQrWidget';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
+  const { subscription } = useSubscription();
 
   const sections = [
     {
@@ -53,12 +56,18 @@ export default function SettingsPage() {
             <div className="w-full space-y-2">
                 <div className="flex justify-between items-center p-3 bg-white/5 rounded-2xl border border-white/5">
                     <span className="text-sm font-bold text-slate-300">Plan</span>
-                    <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg uppercase tracking-wider">Free</span>
+                    <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg uppercase tracking-wider">{subscription?.plan || 'Free'}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-white/5 rounded-2xl border border-white/5">
                    <span className="text-sm font-bold text-slate-300">Shop ID</span>
                    <span className="text-xs font-mono text-slate-400">{user?.shopName || 'N/A'}</span>
                 </div>
+                <Link
+                  href="/dashboard/upgrade"
+                  className="mt-1 inline-flex items-center justify-center w-full px-4 py-3 bg-white text-slate-900 font-bold rounded-2xl shadow-sm hover:shadow transition-all text-sm"
+                >
+                  Upgrade plan
+                </Link>
             </div>
         </div>
 

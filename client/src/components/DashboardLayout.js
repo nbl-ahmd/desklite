@@ -8,7 +8,6 @@ import { useSubscription } from '../contexts/SubscriptionContext';
 import { useSync } from '@/contexts/SyncContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import InstallPrompt from './InstallPrompt';
-import SubscriptionBanner from './SubscriptionBanner';
 import OfflineBanner from './OfflineBanner';
 import ErrorBoundary from './ErrorBoundary';
 import Button from './Button';
@@ -153,7 +152,6 @@ export default function DashboardLayout({ children }) {
         <OfflineBanner />
         
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-           <SubscriptionBanner />
            <InstallPrompt />
            <ErrorBoundary>
              {children}
