@@ -31,7 +31,8 @@ const handler = NextAuth({
           return {
             id: user._id.toString(),
             username: user.username,
-            name: user.name
+            name: user.name,
+            shopId: user._id.toString()
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -50,25 +51,31 @@ const handler = NextAuth({
         token.id = user.id;
         token.username = user.username;
         token.name = user.name;
-        //console.log('User:', user); // 🐛 debug line
-        // Add a signed token for backend
-        token.accessToken = jwt.sign(
-          { id: user.id, username: user.username },
-          process.env.NEXTAUTH_SECRET, // ✅ use a secret from .env
-          { expiresIn: '1h' }
-          // 🐛 debug line
-      );
+        token.shopId = user.shopId || user.id;
+      }
       
-    }
+      // Always generate a fresh access token for API calls
+      // This ensures the token is always valid (not expired)
+      if (process.env.NEXTAUTH_SECRET && token.id) {
+        token.accessToken = jwt.sign(
+          { id: token.id, username: token.username, shopId: token.shopId || token.id },
+          process.env.NEXTAUTH_SECRET,
+          { expiresIn: '24h' } // Longer expiry to reduce overhead
+        );
+      }
      
       return token;
     },
     async session({ session, token }) {
       if (token) {
+        session.user = session.user || {};
         session.user.id = token.id;
         session.user.username = token.username;
         session.user.name = token.name;
-        session.apiToken = token.accessToken;
+        session.user.shopId = token.shopId || token.id;
+        if (token.accessToken) {
+          session.apiToken = token.accessToken;
+        }
       }
       return session;
     }
@@ -77,7 +84,7 @@ const handler = NextAuth({
     signIn: '/login',
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true
+  debug: process.env.NODE_ENV === 'development'
 });
 
 export { handler as GET, handler as POST };

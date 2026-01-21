@@ -1,11 +1,13 @@
 {
-  "name": "Ledger Book",
-  "short_name": "Ledger",
-  "description": "A simple transaction management app for small businesses",
+  "name": "Desklite - Business Manager",
+  "short_name": "Desklite",
+  "description": "Smart transaction and business management for shops and small businesses",
   "start_url": "/dashboard",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#0ea5e9",
+  "theme_color": "#2563eb",
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -18,6 +20,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Transaction",
+      "short_name": "Add",
+      "description": "Quick add transaction",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "View Transactions",
+      "short_name": "Transactions",
+      "url": "/dashboard/transactions",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ]
 } 

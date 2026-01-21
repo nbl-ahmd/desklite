@@ -25,6 +25,39 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Shop details
+  shopName: {
+    type: String,
+    trim: true
+  },
+  shopType: {
+    type: String,
+    enum: ['grocery', 'kirana', 'bakery', 'textiles', 'hardware', 'electronics', 'wholesale', 'retail', 'barber', 'salon', 'medical', 'stationery', 'other'],
+    default: 'other'
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  address: {
+    type: String,
+    trim: true
+  },
+  // UPI Settings for payment reminders
+  upiId: {
+    type: String,
+    trim: true
+  },
+  upiName: {
+    type: String,
+    trim: true
+  },
+  // Preferences
+  language: {
+    type: String,
+    enum: ['en', 'ml'],
+    default: 'en'
+  },
   createdAt: {
     type: Date,
     default: Date.now

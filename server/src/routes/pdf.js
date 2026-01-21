@@ -1,9 +1,55 @@
 const express = require('express');
 const router = express.Router();
 const puppeteer = require('puppeteer');
+const auth = require('../middleware/auth');
+const { requireFeature } = require('../middleware/subscription');
+const Transaction = require('../models/Transaction');
+
+router.use(auth);
+
+const MAX_EXPORT_ROWS = 5000;
+
+// Helper to get browser launch options based on environment
+const getBrowserOptions = () => {
+  const options = {
+    headless: 'new',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process'
+    ]
+  };
+  
+  // Use bundled Chromium in production, allow custom path in development
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    options.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+  
+  return options;
+};
+
+// Helper to safely generate PDF
+const generatePDF = async (html) => {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch(getBrowserOptions());
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+    return pdfBuffer;
+  } finally {
+    if (browser) {
+      await browser.close().catch(err => console.error('Browser close error:', err));
+    }
+  }
+};
 
 // POST /api/pdf/expense-split
-router.post('/expense-split', async (req, res) => {
+router.post('/expense-split', requireFeature('exports', { consume: true }), async (req, res) => {
   try {
     let body = req.body;
     if (typeof body === 'string') {
@@ -92,21 +138,38 @@ router.post('/expense-split', async (req, res) => {
       </html>
     `;
 
-const browser = await puppeteer.launch({
-  executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  args: ['--no-sandbox', '--disable-setuid-sandbox'],
-});
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-    await browser.close();
+    const pdfBuffer = await generatePDF(html);
 
-    // Send as a buffer, not as a string
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="expense_split_report.pdf"');
     res.end(pdfBuffer);
   } catch (err) {
     console.error('Puppeteer PDF error:', err);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
+// Generate PDF from transactions (filtered by query params)
+router.post('/export', requireFeature('exports', { consume: true }), async (req, res) => {
+  try {
+    const { from, to } = req.body;
+    const filter = { shopId: req.user.shopId };
+    if (from) filter.occurredAt = Object.assign({}, filter.occurredAt, { $gte: new Date(from) });
+    if (to) filter.occurredAt = Object.assign({}, filter.occurredAt, { $lte: new Date(to) });
+
+    let transactions = await Transaction.find(filter).sort({ date: -1 }).limit(MAX_EXPORT_ROWS + 1).lean();
+    const truncated = transactions.length > MAX_EXPORT_ROWS;
+    if (truncated) transactions = transactions.slice(0, MAX_EXPORT_ROWS);
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif}table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd}th{background:#f4f4f4}</style></head><body><h2>Expense Report</h2><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Mode</th><th>Note</th></tr></thead><tbody>${transactions.map(t=>`<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.type}</td><td>${t.amount}</td><td>${t.mode||''}</td><td>${t.description||''}</td></tr>`).join('')}</tbody></table></body></html>`;
+
+    const pdfBuffer = await generatePDF(html);
+
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Length': pdfBuffer.length });
+    if (truncated) res.set('X-Export-Truncated', 'true');
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('PDF export failed', err);
     res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });

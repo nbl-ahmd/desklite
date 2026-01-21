@@ -1,0 +1,300 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { ledger } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { getApiToken } from '@/utils/auth';
+import WhatsAppReminderModal from '@/components/WhatsAppReminderModal';
+import { 
+  AlertTriangle, Loader2, Users, IndianRupee, 
+  MessageCircle, Phone, Clock, ChevronRight, 
+  Send, Bell, Calendar, Filter
+} from 'lucide-react';
+
+export default function OverduePage() {
+  const { status } = useSession();
+  const router = useRouter();
+  const { t, language } = useLanguage();
+  const { hasFeature, subscription } = useSubscription();
+  
+  const [rows, setRows] = useState([]);
+  const [dueSoon, setDueSoon] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('overdue');
+  const [reminderStats, setReminderStats] = useState(null);
+  const [sendingReminder, setSendingReminder] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+
+  const fetchReminderStats = async () => {
+    try {
+      const token = await getApiToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setReminderStats(await res.json());
+      }
+    } catch (err) {
+      console.error('Failed to fetch reminder stats:', err);
+    }
+  };
+
+  const fetchDueSoon = async () => {
+    try {
+      const token = await getApiToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/due-soon`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDueSoon(data.transactions || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch due soon:', err);
+    }
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await ledger.outstanding();
+      setRows(res.data.data || []);
+      await Promise.all([fetchReminderStats(), fetchDueSoon()]);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to load overdue list');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      load();
+    }
+  }, [status, load]);
+
+  const sendWhatsAppReminder = async (customer) => {
+    // Open the WhatsApp reminder modal - it will handle phone validation
+    setSelectedCustomer(customer);
+    setShowReminderModal(true);
+  };
+
+  const handleReminderSent = () => {
+    fetchReminderStats();
+    load();
+  };
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  const totalOverdue = rows.reduce((sum, r) => sum + (r.balance || 0), 0);
+  const totalDueSoon = dueSoon.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+  return (
+    <div className="space-y-6 max-w-7xl lg:max-w-full mx-auto pb-24">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">{t('overdue')}</h1>
+          <p className="text-sm font-bold text-slate-500 mt-1">{t('pendingAmount')}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {reminderStats && (
+            <div className="px-3 py-2 bg-blue-50 rounded-xl text-xs font-bold text-blue-700">
+              <Bell className="w-3 h-3 inline mr-1" />
+              {reminderStats.daily.remaining !== null 
+                ? `${reminderStats.daily.remaining}/${reminderStats.daily.limit} ${t('sendReminder')}`
+                : '∞ Reminders'
+              }
+            </div>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-slate-900/20 transition-all active:scale-95"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <button
+          onClick={() => setActiveTab('overdue')}
+          className={`p-5 rounded-3xl border transition-all text-left ${
+            activeTab === 'overdue' 
+              ? 'bg-rose-500 border-rose-500 text-white shadow-lg shadow-rose-500/30' 
+              : 'bg-white border-slate-100 hover:border-slate-200'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
+            activeTab === 'overdue' ? 'bg-white/20' : 'bg-rose-50'
+          }`}>
+            <AlertTriangle className={`w-5 h-5 ${activeTab === 'overdue' ? 'text-white' : 'text-rose-500'}`} />
+          </div>
+          <p className={`text-xs font-bold uppercase tracking-wider ${activeTab === 'overdue' ? 'text-rose-100' : 'text-slate-400'}`}>
+            {t('overdue')}
+          </p>
+          <p className={`text-2xl font-black mt-1 ${activeTab === 'overdue' ? 'text-white' : 'text-slate-900'}`}>
+            ₹{totalOverdue.toLocaleString('en-IN')}
+          </p>
+          <p className={`text-xs font-bold mt-1 ${activeTab === 'overdue' ? 'text-rose-100' : 'text-slate-400'}`}>
+            {rows.length} {t('customers')}
+          </p>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('due-soon')}
+          className={`p-5 rounded-3xl border transition-all text-left ${
+            activeTab === 'due-soon' 
+              ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/30' 
+              : 'bg-white border-slate-100 hover:border-slate-200'
+          }`}
+        >
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
+            activeTab === 'due-soon' ? 'bg-white/20' : 'bg-amber-50'
+          }`}>
+            <Clock className={`w-5 h-5 ${activeTab === 'due-soon' ? 'text-white' : 'text-amber-500'}`} />
+          </div>
+          <p className={`text-xs font-bold uppercase tracking-wider ${activeTab === 'due-soon' ? 'text-amber-100' : 'text-slate-400'}`}>
+            Due Soon (3 days)
+          </p>
+          <p className={`text-2xl font-black mt-1 ${activeTab === 'due-soon' ? 'text-white' : 'text-slate-900'}`}>
+            ₹{totalDueSoon.toLocaleString('en-IN')}
+          </p>
+          <p className={`text-xs font-bold mt-1 ${activeTab === 'due-soon' ? 'text-amber-100' : 'text-slate-400'}`}>
+            {dueSoon.length} transactions
+          </p>
+        </button>
+      </div>
+
+      {/* Customer List */}
+      <div className="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
+        <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">
+            {activeTab === 'overdue' ? t('overdue') + ' Customers' : 'Due Soon'}
+          </h3>
+          {!hasFeature('whatsappReminders') && (
+            <button 
+              onClick={() => router.push('/dashboard/upgrade')}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <MessageCircle className="w-3 h-3" />
+              Upgrade for WhatsApp
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {(activeTab === 'overdue' ? rows : dueSoon).map((row, idx) => {
+            const name = row._id || row.customerName || 'Unknown';
+            const amount = row.balance || row.amount || 0;
+            const phone = row.phone || row.customerPhone;
+            const isOverdue = row.overdue || row.daysOverdue > 0;
+            
+            return (
+              <div key={idx} className="p-5 flex items-center gap-4 hover:bg-slate-50/50 transition-colors">
+                {/* Avatar */}
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg shrink-0">
+                  {name.charAt(0).toUpperCase()}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-slate-900 truncate">{name}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    {isOverdue && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-600">
+                        <AlertTriangle className="w-3 h-3" /> 
+                        {row.daysOverdue ? `${row.daysOverdue}d` : 'Overdue'}
+                      </span>
+                    )}
+                    {row.openCredits > 0 && (
+                      <span className="text-xs font-bold text-slate-400">
+                        {row.openCredits} pending
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Amount */}
+                <div className="text-right shrink-0">
+                  <p className="text-lg font-black text-emerald-600">₹{amount.toLocaleString('en-IN')}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {phone && (
+                    <a
+                      href={`tel:${phone}`}
+                      className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => sendWhatsAppReminder(row)}
+                    disabled={sendingReminder === (row._id || row.customerName)}
+                    className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center text-white hover:bg-green-600 disabled:opacity-50 transition-colors"
+                    title={phone ? 'Send WhatsApp Reminder' : 'No phone number'}
+                  >
+                    {sendingReminder === (row._id || row.customerName) ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Empty State */}
+        {!loading && (activeTab === 'overdue' ? rows : dueSoon).length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+            <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 text-emerald-500">
+              <IndianRupee size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              {activeTab === 'overdue' ? 'No overdue payments!' : 'No upcoming dues!'}
+            </h3>
+            <p className="text-slate-500 text-sm font-medium mt-1">Everyone is paid up! 🎉</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="p-4 bg-rose-50 text-rose-600 text-sm font-bold text-center border-t border-rose-100">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* WhatsApp Reminder Modal */}
+      <WhatsAppReminderModal
+        isOpen={showReminderModal}
+        onClose={() => {
+          setShowReminderModal(false);
+          setSelectedCustomer(null);
+        }}
+        customer={selectedCustomer}
+        onSent={handleReminderSent}
+      />
+    </div>
+  );
+}

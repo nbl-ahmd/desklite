@@ -1,27 +1,38 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import DashboardLayout from '@/components/DashboardLayout';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { getApiToken } from '@/utils/auth';
-
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { 
+  Plus, Search, Calendar, Filter, 
+  ArrowUpRight, ArrowDownLeft, MoreHorizontal, 
+  ArrowDownCircle, ArrowUpCircle,
+  Trash2, Edit2, X, Check, Banknote, Smartphone, CreditCard
+} from 'lucide-react';
+import Card from '@/components/Card';
+import Badge from '@/components/Badge';
+import Button from '@/components/Button';
+import Input from '@/components/Input';
 
 export default function TransactionsPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const { subscription } = useSubscription(); // Kept for future use
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
+  
+  // Filter States
   const [selectedMode, setSelectedMode] = useState('all');
   const [dateRange, setDateRange] = useState('all');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // UI States
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRefs = useRef({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -33,42 +44,46 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     filterTransactions();
-  }, [transactions, selectedMode, dateRange, customStartDate, customEndDate, selectedCustomer]);
+  }, [transactions, selectedMode, dateRange, searchQuery]);
 
   const fetchTransactions = async () => {
     try {
       const token = await getApiToken();
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`, // ✅ Send JWT in header
-        },});
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
-      }
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error('Failed to fetch transactions');
       const data = await response.json();
-      setTransactions(data);
-      setFilteredTransactions(data);
+      // Handle both old array format and new paginated format
+      const txns = Array.isArray(data) ? data : (data.data || []);
+      setTransactions(txns);
+      setFilteredTransactions(txns);
     } catch (error) {
       console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const filterTransactions = () => {
     let filtered = [...transactions];
 
-    // Filter by payment mode
+    // Search Filter
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      filtered = filtered.filter(t => 
+        (t.customerName?.toLowerCase().includes(lowerQuery)) ||
+        (t.description?.toLowerCase().includes(lowerQuery)) ||
+        (t.amount?.toString().includes(lowerQuery))
+      );
+    }
+
+    // Mode Filter
     if (selectedMode !== 'all') {
       filtered = filtered.filter(t => t.mode === selectedMode);
     }
 
-    // Filter by customer name
-    if (selectedCustomer !== 'all') {
-      filtered = filtered.filter(t => t.customerName === selectedCustomer);
-    }
-
-    // Filter by date range
+    // Date Filter
     const now = new Date();
     let startDate, endDate;
 
@@ -85,15 +100,6 @@ export default function TransactionsPage() {
         startDate = startOfDay(subDays(now, 30));
         endDate = endOfDay(now);
         break;
-      case 'custom':
-        if (customStartDate && customEndDate) {
-          startDate = startOfDay(new Date(customStartDate));
-          endDate = endOfDay(new Date(customEndDate));
-        }
-        break;
-      default:
-        startDate = null;
-        endDate = null;
     }
 
     if (startDate && endDate) {
@@ -107,25 +113,16 @@ export default function TransactionsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this transaction?')) return;
 
     try {
       const token = await getApiToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to delete transaction');
-      }
-
-      // Remove the deleted transaction from the state
+      if (!response.ok) throw new Error('Failed to delete transaction');
       setTransactions(transactions.filter(t => t._id !== id));
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -142,33 +139,18 @@ export default function TransactionsPage() {
     e.preventDefault();
     try {
       const token = await getApiToken();
-      
-      // Ensure expense transactions have a default mode
-      const updateData = {
-        ...editingTransaction,
-        mode: editingTransaction.type === 'expense' && !editingTransaction.mode ? 'cash' : editingTransaction.mode
-      };
-      
-      console.log('Sending update data:', updateData);
-      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions/${editingTransaction._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(editingTransaction),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Server error response:', errorData);
-        console.error('Validation errors:', errorData.errors);
-        throw new Error('Failed to update transaction');
-      }
+      if (!response.ok) throw new Error('Failed to update transaction');
 
       const updatedTransaction = await response.json();
-      console.log('Updated transaction response:', updatedTransaction);
       setTransactions(transactions.map(t => 
         t._id === updatedTransaction._id ? updatedTransaction : t
       ));
@@ -180,398 +162,249 @@ export default function TransactionsPage() {
     }
   };
 
-  if (status === 'loading') {
+  const getModeIcon = (mode) => {
+    switch (mode) {
+      case 'cash': return <Banknote className="w-4 h-4" />;
+      case 'upi': return <Smartphone className="w-4 h-4" />;
+      case 'credit': return <CreditCard className="w-4 h-4" />;
+      default: return <Banknote className="w-4 h-4" />;
+    }
+  };
+
+  if (status === 'loading' || loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      </DashboardLayout>
+      <div className="flex h-96 items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold text-gray-900">Transactions</h1>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700"
-          >
-            Add Transaction
-          </button>
+    <div className="space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Transactions</h1>
+          <p className="text-slate-500 font-bold text-sm mt-1">Manage and track your financial records</p>
         </div>
+        <Button 
+          onClick={() => router.push('/dashboard')}
+          icon={Plus}
+          className="w-full sm:w-auto shadow-lg shadow-slate-900/20 bg-slate-900 text-white rounded-2xl py-3 font-bold hover:bg-slate-800"
+        >
+          New Entry
+        </Button>
+      </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setSelectedMode('all')}
-              className={`px-4 py-2 rounded-full text-sm font-medium ${
-                selectedMode === 'all'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setSelectedMode('cash')}
-              className={`px-4 py-2 rounded-full text-sm font-medium ${
-                selectedMode === 'cash'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Cash
-            </button>
-            <button
-              onClick={() => setSelectedMode('upi')}
-              className={`px-4 py-2 rounded-full text-sm font-medium ${
-                selectedMode === 'upi'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              UPI
-            </button>
-            <button
-              onClick={() => setSelectedMode('credit')}
-              className={`px-4 py-2 rounded-full text-sm font-medium ${
-                selectedMode === 'credit'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Credit
-            </button>
+      {/* Search & Filters */}
+      <div className="bg-white p-2 rounded-3xl sticky top-0 md:static z-20 shadow-xl shadow-slate-200/50 border border-slate-100">
+        <div className="flex flex-col gap-2">
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <input 
+              type="text"
+              placeholder="Search by name, note, or amount..."
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl text-slate-900 font-bold placeholder:text-slate-400 focus:ring-2 focus:ring-slate-900/10 transition-all outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
 
-          <div className="flex flex-wrap gap-4">
+          {/* Filter Pills */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide px-1">
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="appearance-none bg-slate-100 border-none text-slate-900 text-xs font-black py-3 px-5 rounded-xl focus:ring-0 cursor-pointer uppercase tracking-wider"
             >
-              <option value="all">All Time</option>
-              <option value="today">Today</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">Last 30 Days</option>
-              <option value="custom">Custom Range</option>
+              <option value="all">📅 All Time</option>
+              <option value="today">📅 Today</option>
+              <option value="week">📅 This Week</option>
+              <option value="month">📅 This Month</option>
             </select>
 
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >
-              <option value="all">All Customers</option>
-              {Array.from(new Set(transactions.filter(t => t.customerName).map(t => t.customerName))).sort().map(customer => (
-                <option key={customer} value={customer}>{customer}</option>
-              ))}
-            </select>
-
-            {dateRange === 'custom' && (
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mode
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Note
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTransactions.map((transaction) => (
-                  <tr key={transaction._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(transaction.date), 'MMM d, yyyy h:mm a')}
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.type === 'income' ? (
-                        <>
-                          {transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1)}
-                        </>
-                      ) : (
-                        transaction.mode ? transaction.mode.charAt(0).toUpperCase() + transaction.mode.slice(1) : 'Cash'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.customerName ? (
-                        <>
-                          {transaction.customerName}
-                          {transaction.customerPhone && (
-                            <>
-                              <br />
-                              <span className="text-xs text-gray-400">{transaction.customerPhone}</span>
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {transaction.description || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(transaction)}
-                          className="text-primary-600 hover:text-primary-900 font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(transaction._id)}
-                          className="text-red-600 hover:text-red-900 font-medium"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {/* Mobile Card List */}
-          <div className="md:hidden divide-y divide-gray-100">
-            {filteredTransactions.length === 0 && (
-              <div className="p-4 text-center text-gray-400">No transactions found.</div>
-            )}
-            {filteredTransactions.map((transaction) => (
-              <div key={transaction._id} className="p-3 flex items-center hover:bg-gray-50 transition-colors relative">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{format(new Date(transaction.date), 'MMM d, yyyy h:mm a')}</span>
-                    <span className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>₹{transaction.amount}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <span className="font-medium">
-                      {transaction.type === 'income' 
-                        ? (transaction.mode?.charAt(0).toUpperCase() + transaction.mode?.slice(1))
-                        : (transaction.mode ? transaction.mode.charAt(0).toUpperCase() + transaction.mode.slice(1) : 'Cash')
-                      }
-                    </span>
-                    {transaction.customerName && (
-                      <span className="text-xs text-gray-500">{transaction.customerName} {transaction.customerPhone && <><span className="text-gray-300">|</span> {transaction.customerPhone}</>}</span>
-                    )}
-                  </div>
-                  {transaction.description && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {transaction.description}
-                    </div>
-                  )}
-                </div>
-                {/* Three dots menu */}
-                <div className="ml-2 relative flex-shrink-0">
-                  <button
-                    aria-label="Open actions"
-                    className="p-2 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    onClick={() => setOpenMenuId(openMenuId === transaction._id ? null : transaction._id)}
-                    ref={el => menuRefs.current[transaction._id] = el}
-                  >
-                    <svg className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <circle cx="12" cy="5" r="1.5" />
-                      <circle cx="12" cy="12" r="1.5" />
-                      <circle cx="12" cy="19" r="1.5" />
-                    </svg>
-                  </button>
-                  {/* Popover menu */}
-                  {openMenuId === transaction._id && (
-                    <div className="absolute right-0 z-20 mt-2 w-28 bg-white rounded shadow-lg ring-1 ring-black ring-opacity-5 animate-fade-in">
-                      <button
-                        onClick={() => { setOpenMenuId(null); handleEdit(transaction); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-primary-700 hover:bg-primary-50 rounded-t"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => { setOpenMenuId(null); handleDelete(transaction._id); }}
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+            {['all', 'cash', 'upi', 'credit'].map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setSelectedMode(mode)}
+                className={`flex-none px-5 py-3 rounded-xl text-xs font-black transition-all whitespace-nowrap uppercase tracking-wider ${
+                  selectedMode === mode
+                    ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 scale-105'
+                    : 'bg-white border border-slate-100 text-slate-400 hover:bg-slate-50 hover:text-slate-600'
+                }`}
+              >
+                {mode === 'all' ? 'All' : mode}
+              </button>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Edit Modal */}
-        {isEditModalOpen && editingTransaction && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h2 className="text-lg font-semibold mb-4">Edit Transaction</h2>
-              <form onSubmit={handleEditSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    value={editingTransaction.amount}
-                    onChange={(e) => setEditingTransaction({
-                      ...editingTransaction,
-                      amount: parseFloat(e.target.value)
-                    })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Payment Mode</label>
-                  <select
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    value={editingTransaction.mode}
-                    onChange={(e) => setEditingTransaction({
-                      ...editingTransaction,
-                      mode: e.target.value
-                    })}
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="upi">UPI</option>
-                    <option value="credit">Credit</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Customer Name</label>
-                  <input
-                    type="text"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    value={editingTransaction.customerName || ''}
-                    onChange={(e) => setEditingTransaction({
-                      ...editingTransaction,
-                      customerName: e.target.value
-                    })}
-                    placeholder="Enter customer name (optional)"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Customer Phone</label>
-                  <input
-                    type="tel"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                    value={editingTransaction.customerPhone || ''}
-                    onChange={(e) => setEditingTransaction({
-                      ...editingTransaction,
-                      customerPhone: e.target.value
-                    })}
-                    placeholder="Enter customer phone (optional)"
-                  />
-                </div>
-
-                {editingTransaction.mode === 'credit' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Customer Name</label>
-                      <input
-                        type="text"
-                        required
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                        value={editingTransaction.customerName}
-                        onChange={(e) => setEditingTransaction({
-                          ...editingTransaction,
-                          customerName: e.target.value
-                        })}
-                      />
+      {/* Transactions List */}
+      <div className="space-y-3">
+        {filteredTransactions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+            <div className="w-24 h-24 bg-slate-50 rounded-3xl flex items-center justify-center mb-6 text-slate-300">
+              <Search className="w-10 h-10" />
+            </div>
+            <h3 className="text-slate-900 font-black text-xl mb-2">No transactions found</h3>
+            <p className="text-slate-500 font-medium max-w-xs mx-auto">Try adjusting your filters or search query to find what you're looking for.</p>
+          </div>
+        ) : (
+          filteredTransactions.map((transaction) => {
+            const isIncome = transaction.type === 'income';
+            return (
+              <div
+                key={transaction._id}
+                onClick={() => handleEdit(transaction)}
+                className="group relative bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all active:scale-[0.98] cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 overflow-hidden">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                      isIncome 
+                        ? 'bg-emerald-50 text-emerald-500 group-hover:bg-emerald-100' 
+                        : 'bg-rose-50 text-rose-500 group-hover:bg-rose-100'
+                    }`}>
+                      {isIncome ? <ArrowDownCircle size={24} /> : <ArrowUpCircle size={24} />}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Customer Phone</label>
-                      <input
-                        type="tel"
-                        required
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                        value={editingTransaction.customerPhone}
-                        onChange={(e) => setEditingTransaction({
-                          ...editingTransaction,
-                          customerPhone: e.target.value
-                        })}
-                      />
+                    
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="text-base font-bold text-slate-900 truncate">
+                          {transaction.customerName || 'Walk-in Customer'}
+                        </h3>
+                        {transaction.mode && (
+                           <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                             {transaction.mode}
+                           </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-slate-400 truncate">
+                        {transaction.description || format(new Date(transaction.date), 'MMM d, yyyy')}
+                      </p>
                     </div>
-                  </>
-                )}
+                  </div>
 
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-lg font-black tracking-tight ${
+                      isIncome ? 'text-emerald-500' : 'text-slate-900'
+                    }`}>
+                      {isIncome ? '+' : '-'}₹{parseFloat(transaction.amount).toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[10px] font-bold text-slate-300 mt-0.5">
+                      {format(new Date(transaction.date), 'h:mm a')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && editingTransaction && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsEditModalOpen(false)} />
+          
+          <Card className="w-full max-w-md relative bg-white rounded-t-3xl sm:rounded-2xl overflow-hidden animate-slide-up sm:animate-in sm:fade-in sm:zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">Transaction Details</h2>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-6">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Amount</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  icon={Banknote}
+                  required
+                  className="text-2xl font-bold"
+                  value={editingTransaction.amount}
+                  onChange={(e) => setEditingTransaction({
+                    ...editingTransaction,
+                    amount: parseFloat(e.target.value)
+                  })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Note/Description (optional)</label>
-                  <textarea
-                    rows="3"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Type</label>
+                  <div className="relative">
+                    <select
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl font-bold text-slate-900 appearance-none focus:ring-2 focus:ring-primary-500"
+                      value={editingTransaction.mode}
+                      onChange={(e) => setEditingTransaction({
+                        ...editingTransaction,
+                        mode: e.target.value
+                      })}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="upi">UPI</option>
+                      <option value="credit">Credit</option>
+                    </select>
+                    <ArrowUpRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none rotate-45" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Customer</label>
+                  <Input
+                     value={editingTransaction.customerName || ''}
+                     onChange={(e) => setEditingTransaction({
+                       ...editingTransaction,
+                       customerName: e.target.value
+                     })}
+                     placeholder="Name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Note</label>
+                 <Input
                     value={editingTransaction.description || ''}
                     onChange={(e) => setEditingTransaction({
                       ...editingTransaction,
                       description: e.target.value
                     })}
-                    placeholder="Add a note or description for this transaction..."
-                  />
-                </div>
+                    placeholder="Add description..."
+                 />
+              </div>
 
-                <div className="flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => {
+              <div className="flex gap-3 pt-4 border-t border-slate-50">
+                <Button 
+                  type="button" 
+                  variant="danger" 
+                  className="flex-1"
+                  onClick={() => {
+                    // Confirm delete
+                    if(confirm('Delete this transaction?')) {
+                      handleDelete(editingTransaction._id); 
                       setIsEditModalOpen(false);
-                      setEditingTransaction(null);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-      </div>
-    </DashboardLayout>
+                    }
+                  }}
+                >
+                  Delete
+                </Button>
+                <Button type="submit" variant="primary" className="flex-[2]">
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+    </div>
   );
-} 
+}

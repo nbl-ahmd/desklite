@@ -2,24 +2,64 @@
 
 import { forwardRef } from 'react';
 
-const Input = forwardRef(({ label, error, ...props }, ref) => {
+const Input = forwardRef(({ 
+  label, 
+  error, 
+  icon: Icon,
+  rightIcon: RightIcon,
+  onRightIconClick,
+  helperText,
+  className = '',
+  disabled,
+  ...props 
+}, ref) => {
   return (
-    <div>
+    <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">
           {label}
         </label>
       )}
-      <input
-        ref={ref}
-        className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
-          error ? 'border-red-300' : ''
-        }`}
-        {...props}
-      />
+      <div className="relative">
+        {Icon && (
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Icon className="h-5 w-5 text-slate-400" aria-hidden="true" />
+          </div>
+        )}
+        <input
+          ref={ref}
+          disabled={disabled}
+          className={`
+            block w-full rounded-xl border-0 bg-slate-50 sm:text-sm transition-all duration-200
+            text-slate-900 font-bold placeholder:text-slate-400 placeholder:font-normal
+            focus:bg-white focus:ring-2 focus:ring-slate-900 focus:shadow-lg
+            disabled:opacity-60 disabled:cursor-not-allowed
+            ${Icon ? 'pl-11' : 'pl-4'}
+            ${RightIcon ? 'pr-11' : 'pr-4'}
+            ${error ? 'ring-2 ring-rose-500/20 bg-rose-50 text-rose-900' : ''}
+            py-3.5
+            ${className}
+          `}
+          {...props}
+        />
+        {RightIcon && (
+          <div 
+            className={`absolute inset-y-0 right-0 pr-4 flex items-center ${onRightIconClick ? 'cursor-pointer' : 'pointer-events-none'}`}
+            onClick={onRightIconClick}
+          >
+            <RightIcon className={`h-5 w-5 ${error ? 'text-rose-500' : 'text-slate-400'}`} aria-hidden="true" />
+          </div>
+        )}
+      </div>
       {error && (
-        <p className="mt-1 text-sm text-red-600">
+        <p className="mt-2 text-sm text-rose-600 font-medium flex items-center gap-1.5 ml-1">
+          <span className="w-1 h-1 rounded-full bg-rose-600 inline-block" />
           {error}
+        </p>
+      )}
+      {!error && helperText && (
+        <p className="mt-2 text-xs text-slate-400 font-medium ml-1">
+          {helperText}
         </p>
       )}
     </div>

@@ -18,17 +18,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Create new user
+    // Create new user (password is hashed by User model pre-save hook)
     user = new User({
       username,
       email,
       password,
       name
     });
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
 
     // Save user
     await user.save();
@@ -69,10 +65,7 @@ router.post('/login', async (req, res) => {
     // Check if user exists
     const user = await User.findOne({ username });
     if (!user) {
-      console.log(username, password);
-      return res.status(400).json({ message: 'Invalid user' });
-      
-      
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // Validate password
@@ -126,6 +119,55 @@ router.get('/me', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET api/auth/profile
+// @desc    Get user profile with shop details
+// @access  Private
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({ user });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PUT api/auth/profile
+// @desc    Update user profile (including UPI details)
+// @access  Private
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const { shopName, upiId, upiName, phone, address, language } = req.body;
+
+    // Build update object with only provided fields
+    const updateFields = {};
+    if (shopName !== undefined) updateFields.shopName = shopName;
+    if (upiId !== undefined) updateFields.upiId = upiId;
+    if (upiName !== undefined) updateFields.upiName = upiName;
+    if (phone !== undefined) updateFields.phone = phone;
+    if (address !== undefined) updateFields.address = address;
+    if (language !== undefined) updateFields.language = language;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updateFields },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ user, message: 'Profile updated successfully' });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: 'Server error' });
