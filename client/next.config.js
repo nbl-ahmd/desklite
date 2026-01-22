@@ -1,3 +1,5 @@
+const isExport = process.env.NEXT_OUTPUT === 'export';
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
@@ -153,12 +155,14 @@ const withPWA = require('next-pwa')({
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: isExport ? 'export' : undefined,
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production'
   },
   images: {
     domains: ['lh3.googleusercontent.com'],
-    formats: ['image/avif', 'image/webp']
+    formats: ['image/avif', 'image/webp'],
+    unoptimized: isExport
   },
   webpack: (config) => {
     config.resolve.alias = {

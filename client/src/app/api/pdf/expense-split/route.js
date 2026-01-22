@@ -1,10 +1,15 @@
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+const isExport = process.env.NEXT_OUTPUT === 'export';
+export const runtime = isExport ? 'nodejs' : 'nodejs';
+export const dynamic = isExport ? 'error' : 'force-dynamic';
 
 import puppeteer from 'puppeteer';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
+  if (isExport) {
+    return NextResponse.json({ error: 'PDF generation is unavailable in static builds' }, { status: 501 });
+  }
+
   try {
     const { splitResults, expenseTransactions, customerExpenses } = await request.json();
 
