@@ -66,7 +66,12 @@ app.use(cors({
     const allowed = [
       'https://desklite.vercel.app',
       'http://localhost:3000',
-      'http://localhost:3001'
+      'http://localhost:3001',
+      'https://7sr93st1-3000.inc1.devtunnels.ms',
+      'https://7sr93st1-3001.inc1.devtunnels.ms',
+      'capacitor://localhost',
+      'http://10.0.2.2:3000'
+
     ];
     if (!origin) return callback(null, true);
     if (allowed.includes(origin) || origin.startsWith('http://localhost')) {

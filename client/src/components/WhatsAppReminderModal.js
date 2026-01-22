@@ -1,6 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+
+// Dynamically import the Share plugin only on native
+let Share;
+if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+  // Use dynamic import to avoid SSR issues
+  import('@capacitor/share').then((mod) => {
+    Share = mod.Share;
+  });
+}
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getApiToken } from '@/utils/auth';
 import { 
@@ -182,11 +192,41 @@ export default function WhatsAppReminderModal({
       // Format phone number
       const cleanPhone = targetPhone.replace(/\D/g, '');
       const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-      
-      // Open WhatsApp (api.whatsapp works on mobile/PWA)
       const linkPart = shareUrl ? `\n\nPay here: ${shareUrl}` : (paymentLink ? `\n\nPay via UPI: ${paymentLink}` : '');
-      const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(`${generatedMessage}${linkPart}`)}`;
-      window.open(whatsappUrl, '_blank');
+      const messageToSend = `${generatedMessage}${linkPart}`;
+
+      if (Capacitor.isNativePlatform()) {
+        // Use native sharing intent for WhatsApp
+        try {
+          // Dynamically import Share plugin if not already loaded
+          if (!Share) {
+            const mod = await import('@capacitor/share');
+            Share = mod.Share;
+          }
+          // If image is available, share both image and text
+          if (reminderImage) {
+            await Share.share({
+              title: 'Payment Reminder',
+              text: messageToSend,
+              url: reminderImage,
+              dialogTitle: 'Share via WhatsApp'
+            });
+          } else {
+            await Share.share({
+              title: 'Payment Reminder',
+              text: messageToSend,
+              dialogTitle: 'Share via WhatsApp'
+            });
+          }
+        } catch (err) {
+          alert('Native sharing failed. Please try again.');
+          console.error('Native WhatsApp share error:', err);
+        }
+      } else {
+        // Web/PWA: Open WhatsApp web link
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageToSend)}`;
+        window.open(whatsappUrl, '_blank');
+      }
 
       onSent?.();
       onClose();

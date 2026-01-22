@@ -1,0 +1,8 @@
+{
+	"appId": "com.desklite.app",
+	"appName": "desklite",
+	"webDir": "public",
+	"server": {
+		"url": "https://desklite.vercel.app"
+	}
+}
