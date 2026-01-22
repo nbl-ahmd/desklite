@@ -5,6 +5,7 @@ import { SyncProvider } from '@/contexts/SyncContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import NativeBridge from './NativeBridge';
 
 export default function Providers({ children }) {
   return (
@@ -13,6 +14,7 @@ export default function Providers({ children }) {
         <SubscriptionProvider>
           <SyncProvider>
             <NotificationsProvider>
+              <NativeBridge />
               {children}
             </NotificationsProvider>
           </SyncProvider>

@@ -11,9 +11,14 @@
     "dev:client": "npm --prefix client run dev",
     "dev:server": "npm --prefix server run dev",
     "build": "npm --prefix client run build && npm --prefix server run build",
+    "build:mobile": "npm --prefix client run build:mobile",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
     "start": "npm --prefix server run start"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
     "concurrently": "^8.2.2"
   },
   "dependencies": {

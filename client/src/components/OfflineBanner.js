@@ -2,25 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import { WifiOff } from 'lucide-react';
+import { getNetworkStatus, isNativePlatform, watchNetwork } from '@/lib/native';
 
 export default function OfflineBanner() {
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
-    function handleOnline() {
-      setIsOffline(false);
-    }
-    function handleOffline() {
-      setIsOffline(true);
-    }
+    let nativeWatcher;
 
-    // Set initial state
-    setIsOffline(!navigator.onLine);
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    const bootstrapStatus = async () => {
+      // Prefer Capacitor network status when running natively
+      if (isNativePlatform()) {
+        const status = await getNetworkStatus();
+        setIsOffline(!status.connected);
+        nativeWatcher = await watchNetwork((state) => setIsOffline(!state.connected));
+      } else {
+        setIsOffline(!navigator.onLine);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+      }
+    };
+
+    bootstrapStatus();
 
     return () => {
+      if (nativeWatcher?.remove) nativeWatcher.remove();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
