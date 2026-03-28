@@ -1,6 +1,6 @@
 const isExport = process.env.NEXT_OUTPUT === 'export';
-export const runtime = isExport ? 'nodejs' : 'nodejs';
-export const dynamic = isExport ? 'error' : 'force-dynamic';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 import puppeteer from 'puppeteer';
 import { NextResponse } from 'next/server';

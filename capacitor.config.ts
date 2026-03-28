@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
         cleartext: true
       }
     : {
-        url: 'https://desklite.vercel.app',
+        url: 'https://7sr93st1-3000.inc1.devtunnels.ms',
         cleartext: true
       },
   android: {

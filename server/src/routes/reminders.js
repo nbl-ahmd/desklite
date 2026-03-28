@@ -912,7 +912,7 @@ router.post('/generate-message', async (req, res) => {
   }
 });
 
-// POST /api/reminders/generate-image - Generate reminder image with QR code
+// POST /api/reminders/generate-image - Generate reminder image
 router.post('/generate-image', async (req, res) => {
   try {
     const { 
@@ -928,19 +928,7 @@ router.post('/generate-image', async (req, res) => {
     const shopPhone = user?.phone || '';
     const upiId = user?.upiId || '';
 
-    if (!upiId) {
-      return res.status(400).json({ 
-        error: 'UPI ID not configured. Please set up your UPI ID in settings.',
-        code: 'NO_UPI_ID'
-      });
-    }
-
-    // Format amount for UPI standard (2 decimal places)
-    const upiAmount = Number(amount).toFixed(2);
-
-    // Generate payment deep link and visuals
-    const paymentLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${upiAmount}&cu=INR&tn=${encodeURIComponent(`Payment from ${customerName}`)}`;
-    const qrDataUrl = await generateUPIQR(upiId, upiAmount, shopName, `Payment from ${customerName}`);
+    // Generate the reminder image (no longer requires UPI)
     const reminderImage = await generateReminderImage({
       customerName,
       amount,
@@ -951,17 +939,26 @@ router.post('/generate-image', async (req, res) => {
       language
     });
 
-    // Public share URL with OG tags for WhatsApp preview
-    const headerHost = req.get('host');
-    const headerProto = req.headers['x-forwarded-proto'] || req.protocol;
-    // Prefer API URL so the share link hits this Express route (ensures OG meta + image reachable)
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL
-      || process.env.APP_URL
-      || process.env.NEXTAUTH_URL
-      || (headerHost ? `${headerProto}://${headerHost}` : '');
-    const shareUrl = baseUrl
-      ? `${baseUrl}/api/reminders/share-card?customerName=${encodeURIComponent(customerName)}&amount=${encodeURIComponent(amount)}&dueDate=${encodeURIComponent(dueDate || '')}&language=${language}&shopName=${encodeURIComponent(shopName)}&shopPhone=${encodeURIComponent(shopPhone)}&upiId=${encodeURIComponent(upiId)}`
-      : '';
+    // Generate payment link & share URL only if UPI is configured
+    let paymentLink = '';
+    let shareUrl = '';
+    let qrDataUrl = null;
+
+    if (upiId) {
+      const upiAmount = Number(amount).toFixed(2);
+      paymentLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${upiAmount}&cu=INR&tn=${encodeURIComponent(`Payment from ${customerName}`)}`;
+      qrDataUrl = await generateUPIQR(upiId, upiAmount, shopName, `Payment from ${customerName}`);
+
+      const headerHost = req.get('host');
+      const headerProto = req.headers['x-forwarded-proto'] || req.protocol;
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL
+        || process.env.APP_URL
+        || process.env.NEXTAUTH_URL
+        || (headerHost ? `${headerProto}://${headerHost}` : '');
+      shareUrl = baseUrl
+        ? `${baseUrl}/api/reminders/share-card?customerName=${encodeURIComponent(customerName)}&amount=${encodeURIComponent(amount)}&dueDate=${encodeURIComponent(dueDate || '')}&language=${language}&shopName=${encodeURIComponent(shopName)}&shopPhone=${encodeURIComponent(shopPhone)}&upiId=${encodeURIComponent(upiId)}`
+        : '';
+    }
 
     // Format amount in Indian currency
     const formattedAmount = new Intl.NumberFormat('en-IN', {
@@ -977,131 +974,9 @@ router.post('/generate-image', async (req, res) => {
       day: 'numeric'
     }) : '';
 
-    // Get labels based on language
-    const labels = language === 'ml' ? {
-      title: 'പേയ്‌മെന്റ് റിമൈൻഡർ',
-      to: 'പേര്',
-      amount: 'തുക',
-      dueDate: 'അവസാന തീയതി',
-      scanToPay: 'പണം അടയ്ക്കാൻ സ്കാൻ ചെയ്യുക',
-      upi: 'UPI ID',
-      from: 'കട'
-    } : {
-      title: 'Payment Reminder',
-      to: 'To',
-      amount: 'Amount',
-      dueDate: 'Due Date',
-      scanToPay: 'Scan to Pay',
-      upi: 'UPI ID',
-      from: 'From'
-    };
-
-    // Generate HTML template for image
-    const htmlTemplate = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          body { margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-          .card {
-            width: 400px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 20px;
-            padding: 30px;
-            color: white;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 25px;
-          }
-          .title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          .shop-name {
-            font-size: 16px;
-            opacity: 0.9;
-          }
-          .details {
-            background: rgba(255,255,255,0.15);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-          }
-          .row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-          }
-          .row:last-child { margin-bottom: 0; }
-          .label { opacity: 0.8; font-size: 14px; }
-          .value { font-weight: bold; font-size: 16px; }
-          .amount-row .value {
-            font-size: 28px;
-            color: #FFD700;
-          }
-          .qr-section {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-          }
-          .qr-title {
-            color: #333;
-            font-size: 14px;
-            margin-bottom: 15px;
-            font-weight: 600;
-          }
-          .qr-image {
-            width: 180px;
-            height: 180px;
-          }
-          .upi-id {
-            color: #666;
-            font-size: 12px;
-            margin-top: 10px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <div class="header">
-            <div class="title">${labels.title}</div>
-            <div class="shop-name">${labels.from}: ${shopName}</div>
-          </div>
-          
-          <div class="details">
-            <div class="row">
-              <span class="label">${labels.to}</span>
-              <span class="value">${customerName}</span>
-            </div>
-            <div class="row amount-row">
-              <span class="label">${labels.amount}</span>
-              <span class="value">${formattedAmount}</span>
-            </div>
-            ${formattedDate ? `<div class="row">
-              <span class="label">${labels.dueDate}</span>
-              <span class="value">${formattedDate}</span>
-            </div>` : ''}
-          </div>
-          
-          <div class="qr-section">
-            <div class="qr-title">${labels.scanToPay}</div>
-            <img class="qr-image" src="${qrDataUrl}" alt="UPI QR Code" />
-            <div class="upi-id">${labels.upi}: ${upiId}</div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
     res.json({ 
-      html: htmlTemplate,
-      qr: qrDataUrl,
       image: reminderImage,
+      qr: qrDataUrl,
       paymentLink,
       shareUrl,
       upiId,
@@ -1109,7 +984,8 @@ router.post('/generate-image', async (req, res) => {
       shopPhone,
       formattedAmount,
       customerName,
-      dueDate: formattedDate
+      dueDate: formattedDate,
+      hasQR: !!upiId
     });
   } catch (error) {
     console.error('Error generating image:', error);

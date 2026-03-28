@@ -22,6 +22,7 @@ async function generateUPIQR(upiId, amount, name, note = 'Payment') {
 }
 
 // Generate SVG-based reminder image (works without native dependencies)
+// Professional clean design like Vyapar/Khatabook — white bg, no QR
 async function generateReminderImage(options) {
   const {
     customerName,
@@ -33,136 +34,149 @@ async function generateReminderImage(options) {
     language = 'en'
   } = options;
 
-  // Generate QR code
-  let qrDataUrl = null;
-  if (upiId) {
-    qrDataUrl = await generateUPIQR(upiId, amount, shopName, `Payment to ${shopName}`);
-  }
+  // Format amount — use Unicode &#x20B9; for rupee symbol in SVG
+  const amountNum = Number(amount);
+  const amountStr = amountNum.toLocaleString('en-IN');
 
-  const formattedAmount = `₹${Number(amount).toLocaleString('en-IN')}`;
   const dateStr = dueDate ? new Date(dueDate).toLocaleDateString(language === 'ml' ? 'ml-IN' : 'en-IN', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
   }) : null;
 
+  const today = new Date().toLocaleDateString(language === 'ml' ? 'ml-IN' : 'en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+
   const texts = {
     en: {
-      reminder: 'Payment Reminder',
-      customer: 'Customer',
+      reminder: 'PAYMENT REMINDER',
+      to: 'To',
       amountDue: 'Amount Due',
-      dueLabel: 'Due Date:',
-      scanToPay: 'Scan to Pay',
-      footer: 'Please pay at your earliest convenience 🙏',
-      contact: 'Contact:',
+      dueLabel: 'Due Date',
+      dateIssued: 'Date',
+      from: 'From',
+      footer: 'Kindly clear the dues at the earliest.',
+      contact: 'Contact',
+      thankYou: 'Thank you for your business!',
       poweredBy: 'Powered by Desklite'
     },
     ml: {
-      reminder: 'പേയ്മെന്റ് റിമൈൻഡർ',
-      customer: 'കസ്റ്റമർ',
+      reminder: 'പേയ്‌മെന്റ് റിമൈൻഡർ',
+      to: 'പേര്',
       amountDue: 'ബാക്കി തുക',
-      dueLabel: 'അവസാന തീയതി:',
-      scanToPay: 'പേയ് ചെയ്യാൻ സ്കാൻ ചെയ്യുക',
-      footer: 'ദയവായി എത്രയും വേഗം അടയ്ക്കുക 🙏',
-      contact: 'ബന്ധപ്പെടുക:',
+      dueLabel: 'അവസാന തീയതി',
+      dateIssued: 'തീയതി',
+      from: 'കട',
+      footer: 'ദയവായി എത്രയും വേഗം ബാക്കി തീർക്കുക.',
+      contact: 'ബന്ധപ്പെടുക',
+      thankYou: 'നന്ദി!',
       poweredBy: 'Powered by Desklite'
     }
   };
 
   const t = texts[language] || texts.en;
 
-  // Create SVG optimized for WhatsApp (1200x630 landscape)
-  // Modern Clean Professional Design - High Visibility Version
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#020617"/>
-          <stop offset="100%" style="stop-color:#1e293b"/>
-        </linearGradient>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
-          <feOffset dx="0" dy="8" result="offsetblur"/>
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.4"/>
-          </feComponentTransfer>
-          <feMerge> 
-            <feMergeNode/>
-            <feMergeNode in="SourceGraphic"/> 
-          </feMerge>
-        </filter>
-        <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-          <circle cx="2" cy="2" r="1.5" fill="#ffffff" fill-opacity="0.05"/>
-        </pattern>
-      </defs>
-      
-      <!-- Background -->
-      <rect width="1200" height="630" fill="url(#bgGradient)"/>
-      <rect width="1200" height="630" fill="url(#grid)"/>
-      
-      <!-- Decorative Elements -->
-      <circle cx="1150" cy="50" r="400" fill="#22c55e" fill-opacity="0.03"/>
-      <circle cx="50" cy="580" r="300" fill="#3b82f6" fill-opacity="0.03"/>
-      <rect width="1200" height="12" fill="#22c55e"/>
-      
-      <!-- Left Content Container -->
-      <g transform="translate(100, 100)">
-         <!-- Shop Name -->
-         <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="36" font-weight="700" fill="#e2e8f0" letter-spacing="1">${escapeXml(shopName).toUpperCase()}</text>
-         
-         <line x1="0" y1="30" x2="550" y2="30" stroke="#334155" stroke-width="2"/>
+  // Truncate long names to prevent overflow
+  const displayName = (customerName || 'Customer').length > 24
+    ? (customerName || 'Customer').substring(0, 22) + '…'
+    : (customerName || 'Customer');
 
-         <!-- Title -->
-         <text x="0" y="80" font-family="'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="500" fill="#94a3b8" letter-spacing="2" text-transform="uppercase">${t.reminder}</text>
-         
-         <!-- Customer Name (Larger) -->
-         <text x="0" y="140" font-family="'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="800" fill="white" style="text-shadow: 0 4px 12px rgba(0,0,0,0.3)">${escapeXml(customerName || 'Customer')}</text>
-         
-         <!-- Amount Section (Much Larger) -->
-         <g transform="translate(0, 240)">
-            <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="500" fill="#cbd5e1">${t.amountDue}</text>
-            <text x="0" y="90" font-family="'Segoe UI', Roboto, sans-serif" font-size="110" font-weight="900" fill="#4ade80" style="text-shadow: 0 4px 20px rgba(34, 197, 94, 0.4)">${formattedAmount}</text>
-         </g>
+  const displayShop = (shopName || 'Shop').length > 28
+    ? (shopName || 'Shop').substring(0, 26) + '…'
+    : (shopName || 'Shop');
 
-         <!-- Due Date Badge -->
-         ${dateStr ? `
-         <g transform="translate(0, 380)">
-            <rect x="0" y="0" width="300" height="48" rx="12" fill="#ea580c" fill-opacity="0.15"/>
-            <text x="16" y="32" font-family="'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="600" fill="#fb923c">📅 ${t.dueLabel} ${dateStr}</text>
-         </g>
-         ` : ''}
+  // Professional WhatsApp-optimized image: 800x1000 portrait (better for mobile viewing)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
+  <defs>
+    <filter id="cardShadow" x="-5%" y="-3%" width="110%" height="108%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="4"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.12"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
 
-         <!-- Footer Contact -->
-         <g transform="translate(0, 500)">
-             <text x="0" y="0" font-family="'Segoe UI', Roboto, sans-serif" font-size="20" fill="#94a3b8">${t.footer}</text>
-             ${shopPhone ? `<text x="0" y="35" font-family="'Segoe UI', Roboto, sans-serif" font-size="18" fill="#64748b">${t.contact} ${shopPhone}</text>` : ''}
-         </g>
-      </g>
-      
-      <!-- Right Section: QR Card -->
-      ${qrDataUrl ? `
-        <g transform="translate(780, 80)" filter="url(#shadow)">
-          <rect x="0" y="0" width="340" height="470" rx="32" fill="white"/>
-          
-          <g transform="translate(170, 50)">
-             <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="28" font-weight="800" fill="#0f172a">${t.scanToPay}</text>
-          </g>
-          
-          <!-- QR Code Image -->
-          <image href="${qrDataUrl}" x="35" y="85" width="270" height="270"/>
-          
-          <g transform="translate(170, 400)">
-            <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="16" fill="#64748b" font-weight="500">${escapeXml(upiId)}</text>
-            <g transform="translate(0, 40)">
-                <text text-anchor="middle" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" fill="#94a3b8">${t.poweredBy}</text>
-            </g>
-          </g>
-        </g>
-      ` : ''}
-    </svg>
-  `;
+  <!-- White background -->
+  <rect width="800" height="1000" fill="#ffffff"/>
 
-  // Return SVG as base64 data URL (can be rendered as image)
+  <!-- Top accent bar -->
+  <rect width="800" height="6" fill="#2563eb"/>
+
+  <!-- Header section -->
+  <rect x="0" y="6" width="800" height="130" fill="#f8fafc"/>
+  <line x1="0" y1="136" x2="800" y2="136" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Shop icon circle -->
+  <circle cx="70" cy="71" r="32" fill="#2563eb"/>
+  <text x="70" y="80" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#ffffff">${escapeXml(displayShop.charAt(0).toUpperCase())}</text>
+
+  <!-- Shop name -->
+  <text x="116" y="62" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#1e293b">${escapeXml(displayShop)}</text>
+  ${shopPhone ? `<text x="116" y="90" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#64748b">${escapeXml(shopPhone)}</text>` : ''}
+
+  <!-- Date on right side -->
+  <text x="755" y="62" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#94a3b8">${t.dateIssued}</text>
+  <text x="755" y="84" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#475569">${today}</text>
+
+  <!-- PAYMENT REMINDER badge -->
+  <rect x="240" y="160" width="320" height="44" rx="22" fill="#fef2f2"/>
+  <rect x="240" y="160" width="320" height="44" rx="22" fill="none" stroke="#fca5a5" stroke-width="1"/>
+  <text x="400" y="188" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#dc2626" letter-spacing="2">${t.reminder}</text>
+
+  <!-- Amount card -->
+  <g filter="url(#cardShadow)">
+    <rect x="50" y="230" width="700" height="200" rx="16" fill="#ffffff"/>
+    <rect x="50" y="230" width="700" height="200" rx="16" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+  </g>
+
+  <text x="400" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#64748b" font-weight="500">${t.amountDue}</text>
+
+  <!-- Rupee symbol + amount — using &#x20B9; for proper rendering -->
+  <text x="400" y="370" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="80" font-weight="900" fill="#dc2626">&#x20B9;${amountStr}</text>
+
+  <line x1="120" y1="400" x2="680" y2="400" stroke="#f1f5f9" stroke-width="2"/>
+
+  <!-- Details section -->
+  <g transform="translate(50, 470)">
+    <!-- Customer row -->
+    <rect x="0" y="0" width="700" height="70" rx="12" fill="#f8fafc"/>
+    <text x="30" y="28" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#94a3b8" font-weight="500">${t.to}</text>
+    <text x="30" y="54" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#1e293b">${escapeXml(displayName)}</text>
+
+    ${dateStr ? `
+    <!-- Due date row -->
+    <rect x="0" y="85" width="700" height="70" rx="12" fill="#fff7ed"/>
+    <text x="30" y="113" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#94a3b8" font-weight="500">${t.dueLabel}</text>
+    <text x="30" y="140" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ea580c">${dateStr}</text>
+    <text x="670" y="130" text-anchor="end" font-family="Arial, Helvetica, sans-serif" font-size="28">&#x1F4C5;</text>
+    ` : ''}
+  </g>
+
+  <!-- Divider -->
+  <line x1="80" y1="${dateStr ? '670' : '590'}" x2="720" y2="${dateStr ? '670' : '590'}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="6,4"/>
+
+  <!-- Footer message -->
+  <text x="400" y="${dateStr ? '720' : '640'}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#475569" font-weight="500">${escapeXml(t.footer)}</text>
+  <text x="400" y="${dateStr ? '755' : '675'}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#94a3b8">${escapeXml(t.thankYou)}</text>
+
+  ${upiId ? `
+  <!-- UPI ID section -->
+  <rect x="200" y="${dateStr ? '790' : '710'}" width="400" height="44" rx="10" fill="#f0fdf4"/>
+  <rect x="200" y="${dateStr ? '790' : '710'}" width="400" height="44" rx="10" fill="none" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="400" y="${dateStr ? '818' : '738'}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#16a34a" font-weight="600">UPI: ${escapeXml(upiId)}</text>
+  ` : ''}
+
+  <!-- Bottom bar -->
+  <rect x="0" y="960" width="800" height="40" fill="#f8fafc"/>
+  <line x1="0" y1="960" x2="800" y2="960" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="400" y="985" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#cbd5e1">${t.poweredBy}</text>
+
+</svg>`;
+
+  // Return SVG as base64 data URL
   const base64Svg = Buffer.from(svg).toString('base64');
   return `data:image/svg+xml;base64,${base64Svg}`;
 }

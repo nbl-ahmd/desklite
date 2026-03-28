@@ -183,19 +183,20 @@ export default function CustomersPage() {
             const amount = activeTab === 'receivables' ? customer.amount : (customer.creditAmount || customer.balance || 0);
             
             return (
-              <div
+              <button
                 key={customer.name}
-                className="group bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all"
+                onClick={() => router.push(`/dashboard/customers/${encodeURIComponent(customer.name)}`)}
+                className="group bg-white p-4 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all w-full text-left"
               >
                 <div className="flex items-center gap-4">
                   {/* Avatar */}
-                  <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 font-black text-lg flex-shrink-0">
+                  <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 font-black text-lg flex-shrink-0 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
                     {customer.name?.charAt(0)?.toUpperCase() || 'C'}
                   </div>
                   
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 truncate">{customer.name}</h3>
+                    <h3 className="font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">{customer.name}</h3>
                     <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
                       {customer.phone && (
                         <>
@@ -212,24 +213,25 @@ export default function CustomersPage() {
                   {/* Amount & Actions */}
                   <div className="flex items-center gap-2">
                     {isReceivable && amount > 0 && (
-                      <p className="text-lg font-black text-rose-600">
-                        ₹{amount.toLocaleString('en-IN')}
-                      </p>
+                      <>
+                        <p className="text-lg font-black text-rose-600">
+                          ₹{amount.toLocaleString('en-IN')}
+                        </p>
+                        
+                        {/* WhatsApp Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openReminderModal(customer, amount);
+                          }}
+                          className="p-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg shadow-green-500/30"
+                          title="Send WhatsApp Reminder"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                        </button>
+                      </>
                     )}
-                    
-                    {/* WhatsApp Button */}
-                    {isReceivable && amount > 0 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openReminderModal(customer, amount);
-                        }}
-                        className="p-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors shadow-lg shadow-green-500/30"
-                        title="Send WhatsApp Reminder"
-                      >
-                        <MessageCircle className="w-5 h-5" />
-                      </button>
-                    )}
+                    <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition-colors" />
                   </div>
                 </div>
 
@@ -240,7 +242,7 @@ export default function CustomersPage() {
                     Overdue by {Math.floor(customer.daysSinceOldest)} days
                   </div>
                 )}
-              </div>
+              </button>
             );
           })
         )}

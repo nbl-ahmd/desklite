@@ -18,8 +18,8 @@ export default function NativeBridge() {
     });
 
     return () => {
-      removeState?.remove?.();
-      removeUrl?.remove?.();
+      if (removeState && typeof removeState.remove === 'function') removeState.remove();
+      if (removeUrl && typeof removeUrl.remove === 'function') removeUrl.remove();
     };
   }, []);
 

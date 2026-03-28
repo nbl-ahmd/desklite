@@ -125,7 +125,7 @@ export default function DashboardSummary() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
              <div className="bg-slate-200 p-1.5 rounded-lg text-slate-600"><Calendar size={16} /></div>
-             <span className="text-sm font-bold text-slate-600 uppercase tracking-wide">Today's Overview</span>
+             <span className="text-sm font-bold text-slate-600 uppercase tracking-wide">Today&apos;s Overview</span>
           </div>
           <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">{new Date().toLocaleDateString('en-GB')}</span>
         </div>

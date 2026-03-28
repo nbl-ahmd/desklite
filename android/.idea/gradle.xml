@@ -5,13 +5,17 @@
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleJvm" value="21" />
+        <option name="gradleJvm" value="17" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/capacitor-cordova-android-plugins" />
             <option value="$PROJECT_DIR$/../node_modules/@capacitor/android/capacitor" />
+            <option value="$PROJECT_DIR$/../node_modules/@capacitor/app/android" />
+            <option value="$PROJECT_DIR$/../node_modules/@capacitor/filesystem/android" />
+            <option value="$PROJECT_DIR$/../node_modules/@capacitor/network/android" />
+            <option value="$PROJECT_DIR$/../node_modules/@capacitor/push-notifications/android" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

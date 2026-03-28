@@ -20,6 +20,26 @@ function urlBase64ToUint8Array(base64String) {
 export default function PushRegistration() {
   const [status, setStatus] = useState('idle');
   const listenersRef = useRef([]);
+  const vapidKeyRef = useRef(null);
+
+  const resolvePublicKey = async () => {
+    if (vapidKeyRef.current) return vapidKeyRef.current;
+    if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      vapidKeyRef.current = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      return vapidKeyRef.current;
+    }
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/push/public-key`);
+      if (res.ok) {
+        const data = await res.json();
+        vapidKeyRef.current = data.publicKey;
+        return vapidKeyRef.current;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch VAPID key', err);
+    }
+    return null;
+  };
 
   useEffect(() => {
     const register = async () => {
@@ -35,7 +55,7 @@ export default function PushRegistration() {
         return;
       }
 
-      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const publicKey = await resolvePublicKey();
       if (!publicKey) {
         setStatus('missing-key');
         console.warn('VAPID public key is not configured');
@@ -57,6 +77,20 @@ export default function PushRegistration() {
 
         // Subscribe
         let subscription = await reg.pushManager.getSubscription();
+        if (subscription) {
+          try {
+            // Ensure key is current; re-subscribe if not
+            const rawKey = subscription.options?.applicationServerKey;
+            const currentKey = rawKey ? btoa(String.fromCharCode.apply(null, new Uint8Array(rawKey))) : null;
+            if (!currentKey || currentKey !== publicKey) {
+              await subscription.unsubscribe();
+              subscription = null;
+            }
+          } catch (err) {
+            console.warn('Existing subscription validation failed, resubscribing', err);
+            subscription = null;
+          }
+        }
         if (!subscription) {
           subscription = await reg.pushManager.subscribe({
             userVisibleOnly: true,

@@ -56,17 +56,21 @@ export function NotificationsProvider({ children }) {
     try {
       const token = await getApiToken();
 
-      const [custRes, payRes] = await Promise.all([
+      const [custRes, payRes, stockRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/due-soon`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/payables/due-soon`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/products?lowStock=1`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
 
       const custData = custRes.ok ? await custRes.json() : { transactions: [] };
       const payData = payRes.ok ? await payRes.json() : { transactions: [] };
+      const stockData = stockRes?.ok ? await stockRes.json() : { products: [] };
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -108,8 +112,22 @@ export function NotificationsProvider({ children }) {
         const bDate = b.dueDate ? new Date(b.dueDate).getTime() : 0;
         return aDate - bDate;
       });
+      const lowStockAlerts = (stockData.products || []).map((p) => ({
+        id: `stock-${p._id}`,
+        type: 'stock',
+        name: p.name,
+        amount: p.stock || 0,
+        dueDate: p.lastRestockedAt || new Date().toISOString(),
+        message: `Low stock (<= ${p.lowStockThreshold || 0})`
+      }));
 
-      setAlerts(combined);
+      const finalAlerts = [...combined, ...lowStockAlerts].sort((a, b) => {
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return aDate - bDate;
+      });
+
+      setAlerts(finalAlerts);
     } catch (e) {
       console.error('alert load failed', e);
     } finally {

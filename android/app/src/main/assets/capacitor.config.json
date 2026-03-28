@@ -1,8 +1,13 @@
 {
 	"appId": "com.desklite.app",
-	"appName": "desklite",
-	"webDir": "public",
+	"appName": "Desklite",
+	"webDir": "client/out",
+	"bundledWebRuntime": false,
 	"server": {
-		"url": "https://desklite.vercel.app"
+		"url": "https://7sr93st1-3000.inc1.devtunnels.ms",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true
 	}
 }

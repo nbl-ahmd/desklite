@@ -1,4 +1,5 @@
 const isExport = process.env.NEXT_OUTPUT === 'export';
+const path = require('path');
 
 const withPWA = require('next-pwa')({
   dest: 'public',
@@ -154,10 +155,10 @@ const withPWA = require('next-pwa')({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   output: isExport ? 'export' : undefined,
+  outputFileTracingRoot: path.join(__dirname, '..'),
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production'
+    removeConsole: false
   },
   images: {
     domains: ['lh3.googleusercontent.com'],

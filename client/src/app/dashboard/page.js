@@ -74,20 +74,22 @@ export default function DashboardPage() {
     // Push notification (best effort) when new alerts arrive
     const notify = async () => {
       if (typeof window === 'undefined' || alerts.length === 0) return;
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
-      const reg = await navigator.serviceWorker?.ready;
-      alerts.forEach((alert) => {
-        if (notifiedRef.current.has(alert.id)) return;
-        notifiedRef.current.add(alert.id);
-        const title = alert.type === 'vendor' ? 'Vendor due soon' : 'Customer due today';
-        const body = `${alert.name}: ₹${Number(alert.amount).toLocaleString('en-IN')}`;
-        if (reg?.showNotification) {
-          reg.showNotification(title, { body, tag: alert.id });
-        } else {
-          new Notification(title, { body, tag: alert.id });
-        }
-      });
+      if (typeof Notification !== 'undefined') {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const reg = await navigator.serviceWorker?.ready;
+        alerts.forEach((alert) => {
+          if (notifiedRef.current.has(alert.id)) return;
+          notifiedRef.current.add(alert.id);
+          const title = alert.type === 'vendor' ? 'Vendor due soon' : 'Customer due today';
+          const body = `${alert.name}: 9${Number(alert.amount).toLocaleString('en-IN')}`;
+          if (reg?.showNotification) {
+            reg.showNotification(title, { body, tag: alert.id });
+          } else {
+            new Notification(title, { body, tag: alert.id });
+          }
+        });
+      }
     };
     if (status === 'authenticated') notify();
   }, [alerts, status]);
@@ -121,15 +123,17 @@ export default function DashboardPage() {
                 className={`flex items-center justify-between px-4 py-3 rounded-2xl border shadow-sm ${
                   alert.type === 'vendor'
                     ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                    : alert.type === 'stock'
+                    ? 'bg-indigo-50 border-indigo-100 text-indigo-800'
                     : 'bg-amber-50 border-amber-100 text-amber-800'
                 }`}
               >
                 <div className="flex flex-col">
                   <span className="text-xs font-bold uppercase tracking-wide">
-                    {alert.type === 'vendor' ? 'Vendor payable' : 'Customer due'}
+                    {alert.type === 'vendor' ? 'Vendor payable' : alert.type === 'stock' ? 'Low stock' : 'Customer due'}
                   </span>
                   <span className="text-sm font-bold">
-                    {alert.name} • ₹{Number(alert.amount).toLocaleString('en-IN')}
+                    {alert.name} • {alert.type === 'stock' ? `Qty ${alert.amount}` : `₹${Number(alert.amount).toLocaleString('en-IN')}`}
                   </span>
                   <span className="text-xs font-semibold opacity-80">{alert.message}</span>
                 </div>

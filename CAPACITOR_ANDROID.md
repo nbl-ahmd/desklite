@@ -2,13 +2,17 @@
 
 Mobile build pipeline:
 - Install deps: `npm install` (workspace) then `npm --prefix client install` and `npm --prefix server install` if needed.
-- Build web bundle for the container: `npm run build:mobile` (sets `NEXT_OUTPUT=export` and writes to `client/out`).
+- Build web app for hosted/native shell mode: `npm run build:mobile` (standard Next build, compatible with dynamic routes).
+- Optional static export bundle (only if you need fully bundled offline pages): `npm run build:mobile:static` (sets `NEXT_OUTPUT=export` and writes to `client/out`).
 - Sync Capacitor assets: `npm run cap:sync` (creates/updates `android/`).
 - Open Android Studio: `npm run cap:open` then build/run from there.
 
 Development with live reload:
 - Run `npm run dev:client` to serve web UI at `http://localhost:3000`.
 - Set `CAP_SERVER_URL=http://<your-ip>:3000` before running `npm run cap:sync` so the native shell uses the dev server.
+CAP_SERVER_URL=https://7sr93st1-3000.inc1.devtunnels.ms npx cap sync android
+- Build/run from Android Studio. The app will load the live site with hot reload.
+
 
 Using a deployed host (Vercel):
 - You can point the native shell at your deployed app (e.g., `https://desklite.vercel.app`).
@@ -18,7 +22,7 @@ Using a deployed host (Vercel):
 
 Push notifications (native FCM):
 - Provide Firebase Admin credentials to the server via `FIREBASE_SERVICE_ACCOUNT_JSON` (or base64 in `FIREBASE_SERVICE_ACCOUNT_BASE64`) or `GOOGLE_APPLICATION_CREDENTIALS`.
-- Add the Firebase Android config file (`android/app/google-services.json`) for the app package `app.desklite.mobile`.
+- Add the Firebase Android config file (`android/app/google-services.json`) for the app package `com.desklite.app`.
 - On device, the app requests permissions and registers the FCM token via `/api/push/subscribe` with `nativeToken`.
 - `POST /api/push/test` now attempts web push (VAPID) and native FCM; native sending is skipped if Firebase Admin credentials are missing.
 

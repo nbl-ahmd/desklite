@@ -28,7 +28,8 @@ import {
   Clock,
   Sparkles,
   Bell,
-  Check
+  Check,
+  Package
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -54,6 +55,8 @@ export default function DashboardLayout({ children }) {
     { name: t('home'), href: '/dashboard', icon: Home },
     { name: t('customers'), href: '/dashboard/customers', icon: Users },
     { name: t('transactions'), href: '/dashboard/transactions', icon: BookOpen },
+    { name: 'Bills', href: '/dashboard/bills', icon: BarChart3 },
+    { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
     { name: t('ledger'), href: '/dashboard/ledger', icon: BookOpen },
     { name: t('overdue'), href: '/dashboard/overdue', icon: Clock },
     { name: t('reports'), href: '/dashboard/reports', icon: BarChart3 },
@@ -171,13 +174,13 @@ export default function DashboardLayout({ children }) {
                       className="px-4 py-3 flex items-start gap-3 hover:bg-slate-50 cursor-pointer"
                       onClick={() => markAsRead(alert.id)}
                     >
-                      <div className={`w-2 h-2 rounded-full mt-1 ${alert.type === 'vendor' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <div className={`w-2 h-2 rounded-full mt-1 ${alert.type === 'vendor' ? 'bg-emerald-500' : alert.type === 'stock' ? 'bg-indigo-500' : 'bg-amber-500'}`} />
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                           {alert.name}
                           {isUnread && <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />}
                         </p>
-                        <p className="text-xs text-slate-500">₹{Number(alert.amount).toLocaleString('en-IN')} • {alert.message}</p>
+                        <p className="text-xs text-slate-500">{alert.type === 'stock' ? `Qty ${alert.amount}` : `₹${Number(alert.amount).toLocaleString('en-IN')}`} • {alert.message}</p>
                         <p className="text-[11px] text-slate-400 mt-1">{alert.dueDate ? new Date(alert.dueDate).toLocaleDateString('en-IN') : ''}</p>
                       </div>
                     </div>

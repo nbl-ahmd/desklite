@@ -69,6 +69,7 @@ app.use(cors({
       'http://localhost:3001',
       'https://7sr93st1-3000.inc1.devtunnels.ms',
       'https://7sr93st1-3001.inc1.devtunnels.ms',
+      'https://7sr93st1-5001.inc1.devtunnels.ms',
       'capacitor://localhost',
       'http://10.0.2.2:3000'
 
@@ -134,8 +135,11 @@ app.use('/api/sync', require('./routes/sync'));
 app.use('/api/ledger', require('./routes/ledger'));
 app.use('/api/summary', require('./routes/summary'));
 app.use('/api/customers', require('./routes/customers'));
+app.use('/api/customer-details', require('./routes/customerDetails'));
 app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/push', require('./routes/push'));
+app.use('/api/bills', require('./routes/bills'));
+app.use('/api/inventory', require('./routes/inventory'));
 
 app.get('/health', (req, res) => {
   const dbState = mongoose.connection.readyState;

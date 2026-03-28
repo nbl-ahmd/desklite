@@ -12,18 +12,32 @@
     "dev:server": "npm --prefix server run dev",
     "build": "npm --prefix client run build && npm --prefix server run build",
     "build:mobile": "npm --prefix client run build:mobile",
+    "build:mobile:static": "npm --prefix client run build:mobile:static",
     "cap:sync": "npx cap sync android",
+    "cap:sync:dev": "dotenv -e client/.env.local -- npx cap sync android",
     "cap:open": "npx cap open android",
     "start": "npm --prefix server run start"
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/network": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.5",
     "bcryptjs": "^3.0.2",
     "date-fns": "^4.1.0",
     "mongoose": "^8.16.0"
+  },
+  "overrides": {
+    "next": "15.5.14",
+    "basic-ftp": "^5.2.0",
+    "undici": "^6.24.0",
+    "fast-xml-parser": "4.5.5"
   }
 }

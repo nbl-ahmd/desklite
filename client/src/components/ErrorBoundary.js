@@ -43,7 +43,7 @@ class ErrorBoundary extends Component {
               Something went wrong
             </h1>
             <p className="text-slate-500 font-medium mb-6">
-              We're sorry, but something unexpected happened. Please try again.
+              We&apos;re sorry, but something unexpected happened. Please try again.
             </p>
             
             {process.env.NODE_ENV === 'development' && this.state.error && (

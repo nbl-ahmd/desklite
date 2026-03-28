@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "895586064577",
+    "project_id": "desklite-7f2c6",
+    "storage_bucket": "desklite-7f2c6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:895586064577:android:f134c665f3a2d6dcce1c40",
+        "android_client_info": {
+          "package_name": "com.desklite.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "895586064577-7vdpu74d9eju3pmvt5lsg9mplnkuco3s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCu3VXCNP5f_Tc0GXPMCKBDCb0ezYO6m78"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "895586064577-7vdpu74d9eju3pmvt5lsg9mplnkuco3s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
