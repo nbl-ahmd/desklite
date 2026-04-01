@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getApiToken } from '@/utils/auth';
+import { apiFetch } from '@/lib/apiFetch';
 
 const NotificationsContext = createContext();
 
@@ -57,13 +58,13 @@ export function NotificationsProvider({ children }) {
       const token = await getApiToken();
 
       const [custRes, payRes, stockRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/due-soon`, {
+        apiFetch('/reminders/due-soon', {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reminders/payables/due-soon`, {
+        apiFetch('/reminders/payables/due-soon', {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/products?lowStock=1`, {
+        apiFetch('/inventory/products?lowStock=1', {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);

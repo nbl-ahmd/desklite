@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowUpCircle, Clock } from 'lucide-react';
 import { getApiToken } from '@/utils/auth';
+import { apiFetch } from '@/lib/apiFetch';
 
 export default function PayablesWidget() {
   const [payables, setPayables] = useState({ vendors: [], total: 0, count: 0 });
@@ -12,7 +13,7 @@ export default function PayablesWidget() {
     const fetchPayables = async () => {
       try {
         const token = await getApiToken();
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/payables`, {
+        const res = await apiFetch('/customers/payables', {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {

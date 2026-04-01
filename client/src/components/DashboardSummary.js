@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getSession } from 'next-auth/react';
 import { Wallet, TrendingUp, TrendingDown, Calendar, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/apiFetch';
 
 export default function DashboardSummary() {
   const [stats, setStats] = useState({
@@ -25,10 +26,10 @@ export default function DashboardSummary() {
       const token = session?.apiToken;
       
       const [quickRes, dailyRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/summary/quick`, {
+        apiFetch('/summary/quick', {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/summary/daily`, {
+        apiFetch('/summary/daily', {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);

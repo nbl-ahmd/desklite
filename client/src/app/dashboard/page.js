@@ -7,6 +7,7 @@ import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getApiToken } from '@/utils/auth';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { apiFetch } from '@/lib/apiFetch';
 import QuickTransactionForm from '@/components/QuickTransactionForm';
 import DashboardSummary from '@/components/DashboardSummary';
 import RecentTransactions from '@/components/RecentTransactions';
@@ -45,11 +46,12 @@ export default function DashboardPage() {
     const fetchToday = async () => {
       try {
         const token = await getApiToken();
-        const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`);
-        url.searchParams.set('from', todayRange.from);
-        url.searchParams.set('to', todayRange.to);
-        url.searchParams.set('limit', '200');
-        const res = await fetch(url.toString(), {
+        const query = new URLSearchParams({
+          from: todayRange.from,
+          to: todayRange.to,
+          limit: '200'
+        });
+        const res = await apiFetch(`/transactions?${query.toString()}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to fetch');

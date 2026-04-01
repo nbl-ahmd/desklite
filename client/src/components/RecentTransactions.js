@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getSession } from 'next-auth/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowDownCircle, ArrowUpCircle, Banknote, Smartphone, CreditCard, Receipt } from 'lucide-react';
+import { apiFetch } from '@/lib/apiFetch';
 import Card from './Card';
 
 export default function RecentTransactions({ limit = 10 }) {
@@ -19,7 +20,7 @@ export default function RecentTransactions({ limit = 10 }) {
       const session = await getSession();
       const token = session?.apiToken;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions?limit=${limit}`, {
+      const response = await apiFetch(`/transactions?limit=${limit}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

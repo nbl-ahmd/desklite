@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getSession } from 'next-auth/react';
 import { ArrowDownCircle, ArrowUpCircle, User, FileText, Smartphone, Calendar as CalendarIcon, CreditCard, Banknote } from 'lucide-react';
 import { useSync } from '@/contexts/SyncContext';
+import { apiFetch } from '@/lib/apiFetch';
 import Button from './Button';
 import Input from './Input';
 import Card from './Card';
@@ -82,7 +83,7 @@ export default function QuickTransactionForm({ onSuccess }) {
       }
       
       const response = isOnline
-        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/transactions`, {
+        ? await apiFetch('/transactions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

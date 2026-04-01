@@ -1,9 +1,10 @@
 import axios from 'axios';
 import { getSession } from 'next-auth/react';
+import { getApiOrigin } from './apiFetch';
 
 // Ensure baseURL always ends with /api
 const getBaseURL = () => {
-  const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const url = getApiOrigin();
   return url.endsWith('/api') ? url : `${url}/api`;
 };
 

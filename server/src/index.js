@@ -74,8 +74,13 @@ app.use(cors({
       'http://10.0.2.2:3000'
 
     ];
+    const isLocalhost = origin?.startsWith('http://localhost') ||
+      origin?.startsWith('https://localhost') ||
+      origin?.startsWith('http://127.0.0.1') ||
+      origin?.startsWith('https://127.0.0.1');
+    const isDevTunnel = /^https:\/\/[a-z0-9-]+\.devtunnels\.ms$/i.test(origin || '');
     if (!origin) return callback(null, true);
-    if (allowed.includes(origin) || origin.startsWith('http://localhost')) {
+    if (allowed.includes(origin) || isLocalhost || isDevTunnel) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));

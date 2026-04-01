@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowDownCircle, MessageCircle, ChevronRight } from 'lucide-react';
 import { getApiToken } from '@/utils/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiFetch } from '@/lib/apiFetch';
 import WhatsAppReminderModal from './WhatsAppReminderModal';
 
 export default function ReceivablesWidget() {
@@ -18,7 +19,7 @@ export default function ReceivablesWidget() {
     const fetchReceivables = async () => {
       try {
         const token = await getApiToken();
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/receivables`, {
+        const res = await apiFetch('/customers/receivables', {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
