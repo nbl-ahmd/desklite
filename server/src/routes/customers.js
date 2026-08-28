@@ -33,7 +33,13 @@ router.get('/', async (req, res) => {
             $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] }
           },
           creditAmount: {
-            $sum: { $cond: [{ $eq: ['$mode', 'credit'] }, '$amount', 0] }
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mode', 'credit'] }, { $eq: ['$isPaid', false] }] },
+                '$amount',
+                0
+              ]
+            }
           },
           transactionCount: { $sum: 1 },
           lastTransaction: { $max: '$date' },
@@ -200,7 +206,9 @@ router.get('/:name', async (req, res) => {
     const summary = transactions.reduce((acc, t) => {
       if (t.type === 'income') acc.totalIncome += t.amount;
       if (t.type === 'expense') acc.totalExpense += t.amount;
-      if (t.mode === 'credit') acc.creditAmount += t.amount;
+      if (t.mode === 'credit' && t.isPaid === false && t.type !== 'expense') {
+        acc.creditAmount += t.amount;
+      }
       return acc;
     }, { totalIncome: 0, totalExpense: 0, creditAmount: 0 });
 

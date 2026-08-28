@@ -316,88 +316,90 @@ export default function InventoryPage() {
       {/* Create Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-30 flex items-end sm:items-center sm:justify-center">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">New product</h2>
               <button onClick={() => { setShowForm(false); resetForm(); }} className="p-2 text-gray-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Name *</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="Milk packet"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">SKU</label>
-                <input
-                  type="text"
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="Optional"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Unit</label>
-                <input
-                  type="text"
-                  value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="pcs"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Cost Price</label>
-                <input
-                  type="number"
-                  value={form.purchasePrice}
-                  onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Selling Price</label>
-                <input
-                  type="number"
-                  value={form.sellingPrice}
-                  onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Opening Stock</label>
-                <input
-                  type="number"
-                  value={form.openingStock}
-                  onChange={(e) => setForm({ ...form, openingStock: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-600">Low Stock Alert At</label>
-                <input
-                  type="number"
-                  value={form.lowStockThreshold}
-                  onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })}
-                  className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
-                  placeholder="5"
-                />
+            <div className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Name *</label>
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="Milk packet"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">SKU</label>
+                  <input
+                    type="text"
+                    value={form.sku}
+                    onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="Optional"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Unit</label>
+                  <input
+                    type="text"
+                    value={form.unit}
+                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="pcs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Cost Price</label>
+                  <input
+                    type="number"
+                    value={form.purchasePrice}
+                    onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Selling Price</label>
+                  <input
+                    type="number"
+                    value={form.sellingPrice}
+                    onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Opening Stock</label>
+                  <input
+                    type="number"
+                    value={form.openingStock}
+                    onChange={(e) => setForm({ ...form, openingStock: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-600">Low Stock Alert At</label>
+                  <input
+                    type="number"
+                    value={form.lowStockThreshold}
+                    onChange={(e) => setForm({ ...form, lowStockThreshold: e.target.value })}
+                    className="w-full border-2 border-gray-200 rounded-lg px-3 py-2"
+                    placeholder="5"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
               <button
                 onClick={() => { setShowForm(false); resetForm(); }}
                 className="px-4 py-2 rounded-lg border-2 border-gray-200 text-gray-700 font-semibold"

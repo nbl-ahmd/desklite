@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { getApiToken } from '@/utils/auth';
-import { Search, Store, Clock, AlertTriangle, ArrowUpRight, Receipt, Phone, MessageCircle } from 'lucide-react';
+import { Search, Store, Clock, AlertTriangle, ArrowUpRight, Receipt, Phone, MessageCircle, ChevronRight } from 'lucide-react';
 
 export default function VendorsPage() {
   const router = useRouter();
@@ -158,7 +158,11 @@ export default function VendorsPage() {
           filteredVendors.map((v) => {
             const days = v.daysSinceOldest ? Math.floor(v.daysSinceOldest) : null;
             return (
-              <div key={v.name} className="bg-white border border-slate-100 rounded-3xl p-4 flex items-center justify-between shadow-sm">
+              <button
+                key={v.name}
+                onClick={() => router.push(`/dashboard/vendors/${encodeURIComponent(v.name)}`)}
+                className="w-full text-left bg-white border border-slate-100 rounded-3xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-all"
+              >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 font-black flex items-center justify-center text-lg">
                     {v.name?.charAt(0)?.toUpperCase() || 'V'}
@@ -175,6 +179,7 @@ export default function VendorsPage() {
                   {v.phone && (
                     <a
                       href={`tel:${v.phone}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="px-3 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
                     >
                       <Phone className="w-4 h-4" />
@@ -185,13 +190,17 @@ export default function VendorsPage() {
                       href={`https://wa.me/${v.phone}`}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="px-3 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 transition-colors"
                     >
                       <MessageCircle className="w-4 h-4" />
                     </a>
                   )}
+                  <span className="px-2 py-2 rounded-xl text-slate-400">
+                    <ChevronRight className="w-4 h-4" />
+                  </span>
                 </div>
-              </div>
+              </button>
             );
           })
         )}

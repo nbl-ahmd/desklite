@@ -15,6 +15,161 @@ const toObjectId = (id) => {
   }
 };
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// GET /api/customer-details/vendor/:name - Vendor expense details page data
+router.get('/vendor/:name', async (req, res) => {
+  try {
+    const shopId = toObjectId(req.user.shopId);
+    const vendorName = decodeURIComponent(req.params.name);
+
+    const {
+      startDate,
+      endDate,
+      mode,        // 'cash' | 'upi' | 'credit'
+      status,      // 'paid' | 'unpaid'
+      sortBy = 'date',
+      sortOrder = 'desc',
+      limit = 100,
+      page = 1
+    } = req.query;
+
+    const filter = {
+      shopId,
+      type: 'expense',
+      customerName: { $regex: new RegExp(`^${escapeRegExp(vendorName)}$`, 'i') }
+    };
+
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) filter.date.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    if (mode) filter.mode = mode;
+    if (status === 'paid') filter.isPaid = true;
+    if (status === 'unpaid') filter.isPaid = false;
+
+    const totalCount = await Transaction.countDocuments(filter);
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const transactions = await Transaction.find(filter)
+      .sort(sort)
+      .limit(parseInt(limit, 10))
+      .skip(skip)
+      .lean();
+
+    const summary = await Transaction.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalTransactions: { $sum: 1 },
+          totalExpense: { $sum: '$amount' },
+          totalCash: {
+            $sum: { $cond: [{ $eq: ['$mode', 'cash'] }, '$amount', 0] }
+          },
+          totalUPI: {
+            $sum: { $cond: [{ $eq: ['$mode', 'upi'] }, '$amount', 0] }
+          },
+          totalCredit: {
+            $sum: { $cond: [{ $eq: ['$mode', 'credit'] }, '$amount', 0] }
+          },
+          paidAmount: {
+            $sum: { $cond: [{ $eq: ['$isPaid', true] }, '$amount', 0] }
+          },
+          unpaidAmount: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mode', 'credit'] }, { $eq: ['$isPaid', false] }] },
+                '$amount',
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    const vendorInfo = await Transaction.findOne(filter)
+      .select('customerName customerPhone')
+      .lean();
+
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const monthlyBreakdown = await Transaction.aggregate([
+      {
+        $match: {
+          ...filter,
+          date: { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$date' },
+            month: { $month: '$date' }
+          },
+          totalExpense: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    const outstandingCredits = await Transaction.find({
+      ...filter,
+      mode: 'credit',
+      isPaid: false
+    })
+      .sort({ dueDate: 1 })
+      .limit(20)
+      .lean();
+
+    const summaryData = summary[0] || {
+      totalTransactions: 0,
+      totalExpense: 0,
+      totalCash: 0,
+      totalUPI: 0,
+      totalCredit: 0,
+      paidAmount: 0,
+      unpaidAmount: 0
+    };
+
+    res.json({
+      vendor: {
+        name: vendorName,
+        phone: vendorInfo?.customerPhone || null
+      },
+      summary: {
+        ...summaryData,
+        netPayable: summaryData.unpaidAmount
+      },
+      transactions,
+      pagination: {
+        currentPage: parseInt(page, 10),
+        totalPages: Math.ceil(totalCount / parseInt(limit, 10)),
+        totalCount,
+        perPage: parseInt(limit, 10),
+        hasMore: skip + transactions.length < totalCount
+      },
+      monthlyBreakdown,
+      outstandingCredits,
+      filters: { startDate, endDate, mode, status }
+    });
+  } catch (error) {
+    console.error('Error fetching vendor details:', error);
+    res.status(500).json({ error: 'Failed to fetch vendor details' });
+  }
+});
+
 // GET /api/customer-details/:name - Get detailed transaction breakdown for a customer
 router.get('/:name', async (req, res) => {
   try {
@@ -37,7 +192,7 @@ router.get('/:name', async (req, res) => {
     // Build filter query
     const filter = {
       shopId,
-      customerName: { $regex: new RegExp(`^${customerName}$`, 'i') }
+      customerName: { $regex: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') }
     };
 
     if (startDate || endDate) {
@@ -89,13 +244,43 @@ router.get('/:name', async (req, res) => {
             $sum: { $cond: [{ $eq: ['$mode', 'upi'] }, '$amount', 0] }
           },
           totalCredit: {
-            $sum: { $cond: [{ $eq: ['$mode', 'credit'] }, '$amount', 0] }
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mode', 'credit'] }, { $ne: ['$type', 'expense'] }] },
+                '$amount',
+                0
+              ]
+            }
           },
           paidAmount: {
-            $sum: { $cond: ['$isPaid', '$amount', 0] }
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$mode', 'credit'] },
+                    { $eq: ['$isPaid', true] },
+                    { $ne: ['$type', 'expense'] }
+                  ]
+                },
+                '$amount',
+                0
+              ]
+            }
           },
           unpaidAmount: {
-            $sum: { $cond: [{ $not: '$isPaid' }, '$amount', 0] }
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$mode', 'credit'] },
+                    { $eq: ['$isPaid', false] },
+                    { $ne: ['$type', 'expense'] }
+                  ]
+                },
+                '$amount',
+                0
+              ]
+            }
           },
           creditIncomeCount: {
             $sum: {
@@ -157,6 +342,7 @@ router.get('/:name', async (req, res) => {
     const outstandingCredits = await Transaction.find({
       ...filter,
       mode: 'credit',
+      type: { $ne: 'expense' },
       isPaid: false
     })
       .sort({ dueDate: 1 })
@@ -184,7 +370,7 @@ router.get('/:name', async (req, res) => {
       summary: {
         ...summaryData,
         balance: summaryData.totalIncome - summaryData.totalExpense,
-        netReceivable: summaryData.totalCredit - summaryData.paidAmount
+        netReceivable: summaryData.unpaidAmount
       },
       transactions,
       pagination: {
@@ -216,7 +402,9 @@ router.post('/:name/mark-paid', async (req, res) => {
 
     const transaction = await Transaction.findOne({
       _id: transactionId,
-      shopId
+      shopId,
+      mode: 'credit',
+      isPaid: false
     });
 
     if (!transaction) {
@@ -250,7 +438,10 @@ router.post('/:name/record-payment', async (req, res) => {
         {
           _id: { $in: transactionIds },
           shopId,
-          customerName: { $regex: new RegExp(`^${customerName}$`, 'i') }
+          customerName: { $regex: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') },
+          mode: 'credit',
+          type: { $ne: 'expense' },
+          isPaid: false
         },
         { isPaid: true }
       );
@@ -288,7 +479,7 @@ router.get('/:name/statement', async (req, res) => {
 
     const filter = {
       shopId,
-      customerName: { $regex: new RegExp(`^${customerName}$`, 'i') }
+      customerName: { $regex: new RegExp(`^${escapeRegExp(customerName)}$`, 'i') }
     };
 
     if (startDate || endDate) {
