@@ -36,6 +36,10 @@ const subscriptionSchema = new mongoose.Schema({
     default: 'active',
     index: true
   },
+  expenseSplittingEnabled: {
+    type: Boolean,
+    default: false
+  },
   graceUntil: {
     type: Date,
     default: null

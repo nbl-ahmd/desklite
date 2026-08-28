@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { ledger } from '@/lib/api';
 import { format, parseISO } from 'date-fns';
 import { Loader2, Search, CalendarRange, Users } from 'lucide-react';
+import ReportExportMenu from '@/components/ReportExportMenu';
 
 export default function LedgerPage() {
   const { data: session, status } = useSession();
@@ -104,6 +105,7 @@ export default function LedgerPage() {
                      {balance >= 0 ? '+' : ''}₹{balance.toFixed(2)}
                    </p>
                 </div>
+                <ReportExportMenu payload={{ kind: 'ledger', customerName: customer }} title={`Ledger - ${customer}`} />
               </div>
               {error && <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-lg">{error}</span>}
             </div>

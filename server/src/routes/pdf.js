@@ -61,6 +61,11 @@ router.post('/expense-split', requireFeature('exports', { consume: true }), asyn
       return res.status(400).json({ error: 'Missing required data' });
     }
 
+    const resultRows = (splitResults.participants || splitResults.results || []).map((row) => {
+      const balance = Number(row.balance ?? ((row.paid || 0) - (row.fairShare || 0)));
+      return { ...row, paid: Number(row.paid || 0), owed: Math.abs(balance), status: balance > 0 ? 'gets' : balance < 0 ? 'owes' : 'settled' };
+    });
+
     const html = `
       <html>
         <head>
@@ -86,7 +91,7 @@ router.post('/expense-split', requireFeature('exports', { consume: true }), asyn
               </tr>
             </thead>
             <tbody>
-              ${(splitResults.results || []).map(r => `
+              ${resultRows.map(r => `
                 <tr>
                   <td>${r.name}</td>
                   <td>₹${Number(r.paid).toFixed(2)}</td>
@@ -129,7 +134,7 @@ router.post('/expense-split', requireFeature('exports', { consume: true }), asyn
               ${(customerExpenses || []).map(c => `
                 <tr>
                   <td>${c.name}</td>
-                  <td>₹${Number(c.total).toFixed(2)}</td>
+                  <td>₹${Number(c.total ?? c.fairShare ?? 0).toFixed(2)}</td>
                 </tr>
               `).join('')}
             </tbody>

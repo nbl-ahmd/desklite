@@ -145,6 +145,8 @@ app.use('/api/reminders', require('./routes/reminders'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/bills', require('./routes/bills'));
 app.use('/api/inventory', require('./routes/inventory'));
+app.use('/api/expense-splits', require('./routes/expenseSplits'));
+app.use('/api/exports', require('./routes/exports'));
 
 app.get('/health', (req, res) => {
   const dbState = mongoose.connection.readyState;

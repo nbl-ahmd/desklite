@@ -51,4 +51,24 @@ router.get('/plan', auth, async (req, res) => {
   }
 });
 
+router.patch('/features', auth, async (req, res) => {
+  try {
+    const { expenseSplittingEnabled } = req.body || {};
+    if (typeof expenseSplittingEnabled !== 'boolean') {
+      return res.status(400).json({ message: 'expenseSplittingEnabled must be boolean' });
+    }
+    const { subscription, statusInfo } = await getSubscriptionWithStatus(req.user.shopId);
+    if (!['pro', 'premium'].includes(subscription.plan)) {
+      return res.status(403).json({ message: 'Expense splitting requires a Pro or Premium plan.' });
+    }
+    subscription.expenseSplittingEnabled = expenseSplittingEnabled;
+    await subscription.save();
+    const refreshed = await getSubscriptionWithStatus(req.user.shopId);
+    return res.json(buildSubscriptionResponse(subscription, statusInfo, refreshed.features));
+  } catch (error) {
+    console.error('Feature toggle error:', error);
+    return res.status(500).json({ message: 'Failed to update feature settings' });
+  }
+});
+
 module.exports = router;

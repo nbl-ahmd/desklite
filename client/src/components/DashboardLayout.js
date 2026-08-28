@@ -29,7 +29,8 @@ import {
   Sparkles,
   Bell,
   Check,
-  Package
+  Package,
+  Scale
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -60,6 +61,7 @@ export default function DashboardLayout({ children }) {
     { name: t('ledger'), href: '/dashboard/ledger', icon: BookOpen },
     { name: t('overdue'), href: '/dashboard/overdue', icon: Clock },
     { name: t('reports'), href: '/dashboard/reports', icon: BarChart3 },
+    ...(subscription?.features?.expenseSplitting?.enabled ? [{ name: 'Expense Splitting', href: '/dashboard/expense-split', icon: Scale }] : []),
     { name: t('notificationsTitle'), href: '/dashboard/notifications', icon: Bell },
     { name: t('upgrade'), href: '/dashboard/upgrade', icon: Sparkles },
     { name: t('settings'), href: '/dashboard/settings', icon: Settings },

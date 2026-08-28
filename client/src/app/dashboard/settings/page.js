@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { User, Bell, Shield, Lock, Smartphone, LogOut, ChevronRight } from 'lucide-react';
+import { User, Bell, Shield, Lock, Smartphone, LogOut, ChevronRight, Users } from 'lucide-react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -10,6 +11,25 @@ import UpiQrWidget from '@/components/UpiQrWidget';
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const { subscription } = useSubscription();
+  const [savingSplitFeature, setSavingSplitFeature] = useState(false);
+
+  const toggleExpenseSplitting = async (enabled) => {
+    setSavingSplitFeature(true);
+    try {
+      const session = await fetch('/api/auth/session').then((r) => r.json());
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/billing/features`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.apiToken}` },
+        body: JSON.stringify({ expenseSplittingEnabled: enabled }),
+      });
+      if (!response.ok) throw new Error((await response.json()).message || 'Unable to update feature');
+      window.location.reload();
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setSavingSplitFeature(false);
+    }
+  };
 
   const sections = [
     {
@@ -78,6 +98,30 @@ export default function SettingsPage() {
             
             {/* UPI QR Setup */}
             <UpiQrWidget />
+
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 bg-slate-50/50 border-b border-slate-100">
+                <h3 className="font-bold text-slate-900">Optional Features</h3>
+              </div>
+              <div className="px-6 py-5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600"><Users size={20} /></div>
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">Expense Splitting</p>
+                    <p className="text-xs font-medium text-slate-400">Available on Pro and Premium plans</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={!subscription?.features?.expenseSplitting?.eligible || savingSplitFeature}
+                  onClick={() => toggleExpenseSplitting(!subscription?.features?.expenseSplitting?.enabled)}
+                  className={`relative w-12 h-7 rounded-full transition-colors disabled:opacity-40 ${subscription?.features?.expenseSplitting?.enabled ? 'bg-purple-600' : 'bg-slate-300'}`}
+                  aria-label="Toggle Expense Splitting"
+                >
+                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${subscription?.features?.expenseSplitting?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
 
             {sections.map((section) => (
                 <div key={section.title} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
