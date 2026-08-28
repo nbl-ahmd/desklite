@@ -108,17 +108,19 @@ export default function SettingsPage() {
                   <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600"><Users size={20} /></div>
                   <div>
                     <p className="font-bold text-slate-900 text-sm">Expense Splitting</p>
-                    <p className="text-xs font-medium text-slate-400">Available on Pro and Premium plans</p>
+                    <p className="text-xs font-medium text-slate-400">Available to everyone</p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  disabled={!subscription?.features?.expenseSplitting?.eligible || savingSplitFeature}
+                  disabled={savingSplitFeature}
                   onClick={() => toggleExpenseSplitting(!subscription?.features?.expenseSplitting?.enabled)}
-                  className={`relative w-12 h-7 rounded-full transition-colors disabled:opacity-40 ${subscription?.features?.expenseSplitting?.enabled ? 'bg-purple-600' : 'bg-slate-300'}`}
                   aria-label="Toggle Expense Splitting"
+                  className={`group relative inline-flex h-8 w-14 shrink-0 items-center rounded-full border transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${subscription?.features?.expenseSplitting?.enabled ? 'border-purple-500 bg-purple-600 shadow-[0_0_0_3px_rgba(168,85,247,0.12)]' : 'border-slate-200 bg-slate-300'}`}
                 >
-                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${subscription?.features?.expenseSplitting?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span
+                    className={`pointer-events-none absolute left-1 h-6 w-6 rounded-full bg-white shadow-md ring-1 ring-slate-200 transition-transform duration-200 ease-out ${subscription?.features?.expenseSplitting?.enabled ? 'translate-x-6' : 'translate-x-0'}`}
+                  />
                 </button>
               </div>
             </div>

@@ -276,8 +276,8 @@ function buildFeatureFlags(subscription) {
     monthlySummary: { enabled: config.monthlySummary },
     customerWiseReport: { enabled: config.customerWiseReport },
     expenseSplitting: {
-      enabled: ['pro', 'premium'].includes(subscription.plan) && (subscription.expenseSplittingEnabled ?? true) === true,
-      eligible: ['pro', 'premium'].includes(subscription.plan),
+      enabled: true,
+      eligible: true,
     },
     // Backup
     backup: { enabled: config.backup },
