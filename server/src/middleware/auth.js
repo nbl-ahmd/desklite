@@ -22,7 +22,7 @@ module.exports = async (req, res, next) => {
       req.user = {
         id: verified.id,
         username: verified.username,
-        shopId: verified.shopId || verified.id
+        shopId: verified.shopId || verified.userId || verified.id,
       };
 
       return next();

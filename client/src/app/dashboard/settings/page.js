@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import UpiQrWidget from '@/components/UpiQrWidget';
+import { getApiToken } from '@/utils/auth';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
@@ -16,16 +17,27 @@ export default function SettingsPage() {
   const toggleExpenseSplitting = async (enabled) => {
     setSavingSplitFeature(true);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
+      const token = await getApiToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/billing/features`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.apiToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ expenseSplittingEnabled: enabled }),
       });
-      if (!response.ok) throw new Error((await response.json()).message || 'Unable to update feature');
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.message || payload.error || 'Unable to update feature');
+      }
+
       window.location.reload();
     } catch (error) {
-      alert(error.message);
+      alert(error.message || 'Unable to update feature');
     } finally {
       setSavingSplitFeature(false);
     }
