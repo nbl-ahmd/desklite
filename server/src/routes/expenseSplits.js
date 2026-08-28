@@ -1,13 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const auth = require('../middleware/auth');
-const { requireFeature } = require('../middleware/subscription');
 const Transaction = require('../models/Transaction');
 const Bill = require('../models/Bill');
 const ExpenseSplit = require('../models/ExpenseSplit');
 
 const router = express.Router();
-router.use(auth, requireFeature('expenseSplitting'));
+router.use(auth);
 
 const objectId = (id) => new mongoose.Types.ObjectId(id);
 const shopFilter = (req) => ({ shopId: objectId(req.user.shopId) });
@@ -82,24 +81,62 @@ async function loadSources(req, from, to) {
 function money(value) { return Math.round((Number(value) || 0) * 100); }
 function currency(cents) { return Number((cents / 100).toFixed(2)); }
 
+function normalizeDisplayName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesParticipantName(sourceName, participantName) {
+  const sourceText = normalizeDisplayName(sourceName);
+  const participantText = normalizeDisplayName(participantName);
+  if (!sourceText || !participantText) return false;
+
+  if (sourceText === participantText) return true;
+
+  const sourceWords = new Set(sourceText.split(' '));
+  const participantWords = new Set(participantText.split(' '));
+  const commonWords = [...sourceWords].filter((word) => word.length > 1 && participantWords.has(word));
+  if (commonWords.length > 0) return true;
+
+  return sourceText.includes(participantText) || participantText.includes(sourceText);
+}
+
 function calculate(sources, input) {
   const selected = sources.filter((s) => input.selectedSourceIds.includes(s.id));
   const fundIds = new Set(input.fundSourceIds || []);
   const activeParticipants = (input.participants || [])
     .filter((p) => p.enabled !== false && String(p.name || '').trim() && Number(p.quantity) > 0)
     .map((p) => ({ name: String(p.name).trim(), referenceId: p.referenceId || null, quantity: Number(p.quantity) }));
-  const familyParticipants = activeParticipants.filter((p) => p.name.toLowerCase() !== 'group fund');
+  const familyParticipants = activeParticipants.filter((p) => normalizeDisplayName(p.name) !== 'group fund');
   const expenses = selected.filter((s) => s.type === 'expense');
   const incomes = selected.filter((s) => s.type === 'income');
   const totalExpenseCents = expenses.reduce((sum, s) => sum + money(s.amount), 0);
+  const totalIncomeCents = incomes.reduce((sum, s) => sum + money(s.amount), 0);
   const fundCents = incomes.filter((s) => fundIds.has(s.id)).reduce((sum, s) => sum + money(s.amount), 0);
+  const groupFundBaseCents = fundCents > 0 ? fundCents : Math.max(0, totalIncomeCents - totalExpenseCents);
   const paidBy = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
+  const personalExpenseClaims = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
+
+  for (const expense of expenses) {
+    const participantName = familyParticipants.find((p) => matchesParticipantName(`${expense.name || ''} ${expense.description || ''}`, p.name));
+    if (participantName) {
+      const amount = money(expense.amount);
+      paidBy[participantName.name] += amount;
+      personalExpenseClaims[participantName.name] += amount;
+    }
+  }
+
   for (const income of incomes) {
     if (fundIds.has(income.id)) continue;
     const name = income.name || '';
     if (Object.prototype.hasOwnProperty.call(paidBy, name)) paidBy[name] += money(income.amount);
   }
-  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, totalExpenseCents - fundCents) : totalExpenseCents;
+
+  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, totalExpenseCents - groupFundBaseCents) : totalExpenseCents;
   const quantityTotal = familyParticipants.reduce((sum, p) => sum + p.quantity, 0);
   const shares = {};
   let assigned = 0;
@@ -110,24 +147,29 @@ function calculate(sources, input) {
     shares[p.name] = share;
     assigned += share;
   });
+
   const balances = familyParticipants.map((p) => ({
     name: p.name,
     quantity: p.quantity,
     paid: paidBy[p.name] || 0,
     fairShare: shares[p.name] || 0,
+    personalExpense: personalExpenseClaims[p.name] || 0,
     balance: (paidBy[p.name] || 0) - (shares[p.name] || 0),
   }));
 
-  // Fund-first: use a fund balance to cover deficits before family-to-family transfers.
-  let availableFund = input.groupFundMode === 'participant' ? fundCents : 0;
+  let availableFund = input.groupFundMode === 'participant' ? groupFundBaseCents : 0;
+  const fundAllocations = [];
+  const fundBeforeReimbursement = groupFundBaseCents;
   for (const item of balances) {
     if (item.balance < 0 && availableFund > 0) {
       const used = Math.min(availableFund, -item.balance);
       item.fundApplied = used;
       item.balance += used;
       availableFund -= used;
+      fundAllocations.push({ from: 'Group Fund', to: item.name, amount: currency(used) });
     } else item.fundApplied = 0;
   }
+
   const creditors = balances.filter((b) => b.balance > 0).map((b) => ({ ...b }));
   const debtors = balances.filter((b) => b.balance < 0).map((b) => ({ ...b, balance: -b.balance }));
   const settlements = [];
@@ -140,18 +182,44 @@ function calculate(sources, input) {
       creditor.balance -= amount;
     }
   }
+
+  const reimbursements = balances
+    .filter((entry) => (entry.personalExpense || 0) > 0)
+    .map((entry) => ({
+      name: entry.name,
+      amount: currency(entry.personalExpense),
+      reason: 'Personal expense reimbursement',
+    }));
+
   const remainingCredits = creditors.reduce((sum, item) => sum + item.balance, 0);
   const remainingDebts = debtors.reduce((sum, item) => sum + item.balance, 0);
+  const groupPayouts = fundAllocations.map((item) => ({ from: 'Group Fund', to: item.to, amount: item.amount }));
+  const combinedSettlements = [...groupPayouts, ...settlements];
+
   return {
     totalExpenses: currency(totalExpenseCents),
-    totalIncome: currency(incomes.reduce((sum, s) => sum + money(s.amount), 0)),
+    totalIncome: currency(totalIncomeCents),
     groupFund: currency(fundCents),
-    groupFundRemaining: currency(availableFund),
+    groupFundBeforeReimbursement: currency(fundBeforeReimbursement),
+    groupFundRemaining: currency(fundBeforeReimbursement),
+    groupFundAfterReimbursement: currency(availableFund),
+    groupFundUsed: currency(Math.max(0, fundBeforeReimbursement - availableFund)),
     groupFundMode: input.groupFundMode,
+    groupFundAllocations: fundAllocations,
+    groupPayouts,
+    reimbursements,
     totalQuantity: quantityTotal,
     costPerPerson: quantityTotal ? currency(splitExpenseCents / quantityTotal) : 0,
-    participants: balances.map((b) => ({ ...b, paid: currency(b.paid), fairShare: currency(b.fairShare), balance: currency(b.balance), fundApplied: currency(b.fundApplied || 0) })),
+    participants: balances.map((b) => ({
+      ...b,
+      paid: currency(b.paid),
+      fairShare: currency(b.fairShare),
+      personalExpense: currency(b.personalExpense),
+      balance: currency(b.balance),
+      fundApplied: currency(b.fundApplied || 0),
+    })),
     settlements,
+    combinedSettlements,
     selectedSourceCount: selected.length,
     reconciliation: currency(remainingCredits - remainingDebts),
     reconciliationStatus: remainingCredits === remainingDebts ? 'reconciled' : 'unbalanced'
