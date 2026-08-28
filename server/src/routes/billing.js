@@ -23,6 +23,7 @@ router.post('/activate', auth, async (req, res) => {
           expiryDate: expiry,
           status: 'active',
           graceUntil: null,
+          expenseSplittingEnabled: ['pro', 'premium'].includes(planId) ? true : false,
         }
       },
       { upsert: true, new: true }
