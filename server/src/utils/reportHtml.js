@@ -25,14 +25,17 @@ function buildReportHtml(data, compact = false) {
   const metrics = (data.metrics || []).map((item) => `<div class="metric"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong></div>`).join('');
   const modes = Object.entries(data.modes || {}).map(([key, value]) => `<span>${escapeHtml(key.toUpperCase())}: <b>${money(value)}</b></span>`).join(' · ');
   const { incoming, outgoing, moves } = buildSettlementMaps(data);
+  const totalReceivable = [...incoming.values()].reduce((sum, value) => sum + value, 0);
+  const totalPayable = [...outgoing.values()].reduce((sum, value) => sum + value, 0);
 
   const participantCards = (data.rows || []).map((row) => {
     const paidText = row.personalSpend > 0 ? `Paid ${money(row.directPaid)} + spend ${money(row.personalSpend)}` : `Paid ${money(row.paid)}`;
     const receiveAmount = Number(incoming.get(row.name) || 0);
     const payAmount = Number(outgoing.get(row.name) || 0);
+    const pendingAmount = row.balance > 0 ? Math.max(0, Number(row.balance || 0) - receiveAmount) : 0;
     const balanceText = receiveAmount > 0 ? `Receives ${money(receiveAmount)}` : payAmount > 0 ? `Pays ${money(payAmount)}` : 'Settled';
     const balanceClass = receiveAmount > 0 ? 'receive' : 'pay';
-    return `<div class="split-row"><div><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(`${row.quantity} qty · ${paidText} · share ${money(row.fairShare)}`)}</span></div><b class="${balanceClass}">${escapeHtml(balanceText)}</b></div>`;
+    return `<div class="split-row"><div><strong>${escapeHtml(row.name)}</strong><span>${escapeHtml(`${row.quantity} qty · ${paidText} · share ${money(row.fairShare)}`)}</span></div><b class="${balanceClass}">${escapeHtml(balanceText)}${pendingAmount > 0 ? `<small>Pending ${money(pendingAmount)}</small>` : ''}</b></div>`;
   }).join('');
 
   const participantTable = (data.rows || []).length
@@ -47,15 +50,19 @@ function buildReportHtml(data, compact = false) {
   const summaryRows = (data.rows || []).map((row) => {
     const receiveAmount = Number(incoming.get(row.name) || 0);
     const payAmount = Number(outgoing.get(row.name) || 0);
+    const pendingAmount = row.balance > 0 ? Math.max(0, Number(row.balance || 0) - receiveAmount) : 0;
     const net = receiveAmount - payAmount;
-    return `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(String(row.quantity))}</td><td>${money(row.paid)}</td><td>${money(row.personalSpend)}</td><td>${money(row.fairShare)}</td><td class="${net >= 0 ? 'income' : 'expense'}">${net >= 0 ? `Receives ${money(net)}` : `Pays ${money(Math.abs(net))}`}</td></tr>`;
+    const finalText = receiveAmount > 0 ? `Receives ${money(receiveAmount)}${pendingAmount > 0 ? ` · Pending ${money(pendingAmount)}` : ''}` : payAmount > 0 ? `Pays ${money(payAmount)}` : 'Settled';
+    return `<tr><td>${escapeHtml(row.name)}</td><td>${escapeHtml(String(row.quantity))}</td><td>${money(row.paid)}</td><td>${money(row.personalSpend)}</td><td>${money(row.fairShare)}</td><td class="${net >= 0 ? 'income' : 'expense'}">${finalText}</td></tr>`;
   }).join('');
-  const totalReceivable = [...incoming.values()].reduce((sum, value) => sum + value, 0);
-  const totalPayable = [...outgoing.values()].reduce((sum, value) => sum + value, 0);
+  const totalPending = (data.rows || []).reduce((sum, row) => {
+    const receiveAmount = Number(incoming.get(row.name) || 0);
+    return sum + (row.balance > 0 ? Math.max(0, Number(row.balance || 0) - receiveAmount) : 0);
+  }, 0);
 
   const splitSections = compact
     ? `<section class="split-list">${participantCards || `<p>${escapeHtml(data.text?.noData || 'No records')}</p>`}</section>`
-    : `<section class="section"><h2>Participant breakdown</h2>${participantTable}</section><section class="section"><h2>Settlement summary</h2><table class="table"><thead><tr><th>Name</th><th>Qty</th><th>Paid</th><th>Personal</th><th>Share</th><th>Final</th></tr></thead><tbody>${summaryRows}</tbody></table><div class="modes" style="margin-top:12px">Total to receive: <b>${money(totalReceivable)}</b> · Total to pay: <b>${money(totalPayable)}</b> · Difference: <b>${money(totalReceivable - totalPayable)}</b></div></section>${(data.selectedSources || []).length ? `<section class="section"><h2>Selected records</h2><table class="table"><thead><tr><th>Date</th><th>Kind</th><th>Type</th><th>Amount</th><th>Mode</th><th>Note</th></tr></thead><tbody>${selectedRows}</tbody></table></section>` : ''}${settlementRows ? `<section class="section"><h2>Settlements</h2><table class="table"><thead><tr><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody>${settlementRows}</tbody></table></section>` : ''}${fundRows ? `<section class="section"><h2>Fund allocations</h2><table class="table"><thead><tr><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody>${fundRows}</tbody></table></section>` : ''}${reimbursementRows ? `<section class="section"><h2>Reimbursements</h2><table class="table"><thead><tr><th>Name</th><th>Reason</th><th>Amount</th></tr></thead><tbody>${reimbursementRows}</tbody></table></section>` : ''}`;
+    : `<section class="section"><h2>Participant breakdown</h2>${participantTable}</section><section class="section"><h2>Settlement summary</h2><table class="table"><thead><tr><th>Name</th><th>Qty</th><th>Paid</th><th>Personal</th><th>Share</th><th>Final</th></tr></thead><tbody>${summaryRows}</tbody></table><div class="modes" style="margin-top:12px">Total to receive: <b>${money(totalReceivable)}</b> · Total to pay: <b>${money(totalPayable)}</b> · Pending: <b>${money(totalPending)}</b></div></section>${(data.selectedSources || []).length ? `<section class="section"><h2>Selected records</h2><table class="table"><thead><tr><th>Date</th><th>Kind</th><th>Type</th><th>Amount</th><th>Mode</th><th>Note</th></tr></thead><tbody>${selectedRows}</tbody></table></section>` : ''}${settlementRows ? `<section class="section"><h2>Settlements</h2><table class="table"><thead><tr><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody>${settlementRows}</tbody></table></section>` : ''}${fundRows ? `<section class="section"><h2>Fund allocations</h2><table class="table"><thead><tr><th>From</th><th>To</th><th>Amount</th></tr></thead><tbody>${fundRows}</tbody></table></section>` : ''}${reimbursementRows ? `<section class="section"><h2>Reimbursements</h2><table class="table"><thead><tr><th>Name</th><th>Reason</th><th>Amount</th></tr></thead><tbody>${reimbursementRows}</tbody></table></section>` : ''}`;
 
   const transactionSection = compact
     ? (data.rows || []).length ? `<section class="section"><h2>${escapeHtml(data.text?.details || 'Details')}</h2><div class="split-list">${transactionCards}</div></section>` : ''

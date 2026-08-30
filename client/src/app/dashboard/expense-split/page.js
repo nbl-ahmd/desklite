@@ -8,6 +8,21 @@ import { CalendarDays, Check, Plus, Save, Trash2, X } from 'lucide-react';
 const apiUrl = () => `${process.env.NEXT_PUBLIC_API_URL}/api/expense-splits`;
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const getSettlementMaps = (result) => {
+  const moves = [...(result?.combinedSettlements || []), ...(result?.fundAllocations || []), ...(result?.settlements || [])];
+  const incoming = new Map();
+  const outgoing = new Map();
+
+  moves.forEach((move) => {
+    const amount = Number(move.amount || 0);
+    if (!amount) return;
+    if (move.to) incoming.set(move.to, (incoming.get(move.to) || 0) + amount);
+    if (move.from) outgoing.set(move.from, (outgoing.get(move.from) || 0) + amount);
+  });
+
+  return { incoming, outgoing };
+};
+
 export default function ExpenseSplitPage() {
   const [from, setFrom] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
@@ -23,6 +38,7 @@ export default function ExpenseSplitPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [incomeSourceMode, setIncomeSourceMode] = useState('all');
+  const settlementMaps = result ? getSettlementMaps(result) : { incoming: new Map(), outgoing: new Map() };
 
   const request = async (path, options = {}) => {
     const token = await getApiToken();
@@ -138,13 +154,13 @@ export default function ExpenseSplitPage() {
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-5">
             <div>
               <h2 className="text-2xl font-black">Split result</h2>
-              <p className="text-slate-400 text-sm">{result.selectedSourceCount} selected records · {result.reconciliation === 0 ? 'Reconciled' : 'Review rounding'}</p>
+              <p className="text-slate-400 text-sm">{result.selectedSourceCount} selected records · {result.reconciliation === 0 ? 'Reconciled' : 'Review rounding'}{result.reconciliation !== 0 ? ` · pending ${money(Math.abs(result.reconciliation))}` : ''}</p>
             </div>
             {currentId ? <ReportExportMenu payload={{ kind: 'split', splitId: currentId }} title={title || 'Expense Split'} tone="dark" /> : <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-300">Save the split to enable PDF and image sharing.</div>}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-            {[['Expenses', result.totalExpenses], ['Income', result.totalIncome], ['Fund balance', result.groupFundBeforeReimbursement ?? result.groupFund], ['Per person', result.costPerPerson], ['Quantity', result.totalQuantity]].map(([label, value]) => (
+            {[['Expenses', result.totalExpenses], ['Income', result.totalIncome], ['Fund balance', result.groupFundBeforeReimbursement ?? result.groupFund], ['To receive', [...settlementMaps.incoming.values()].reduce((sum, value) => sum + value, 0)], ['Quantity', result.totalQuantity]].map(([label, value]) => (
               <div key={label} className="bg-white/10 rounded-2xl p-3 sm:p-4">
                 <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
                 <p className="font-black mt-1 text-lg break-words">{label === 'Quantity' ? value : money(value)}</p>
@@ -152,10 +168,19 @@ export default function ExpenseSplitPage() {
             ))}
           </div>
 
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 flex flex-wrap gap-x-4 gap-y-1">
+            <span>Total received: <b className="text-white">{money([...settlementMaps.incoming.values()].reduce((sum, value) => sum + value, 0))}</b></span>
+            <span>Total paid: <b className="text-white">{money([...settlementMaps.outgoing.values()].reduce((sum, value) => sum + value, 0))}</b></span>
+            <span>Pending: <b className="text-white">{money(Math.abs(result.reconciliation || 0))}</b></span>
+          </div>
+
           <div className="space-y-3">
             {result.participants.map((p) => {
               const personalSpend = Number(p.personalExpense || 0);
               const directPaid = Math.max(0, Number(p.paid || 0) - personalSpend);
+              const receiveAmount = Number(settlementMaps.incoming.get(p.name) || 0);
+              const payAmount = Number(settlementMaps.outgoing.get(p.name) || 0);
+              const pendingAmount = p.balance > 0 ? Math.max(0, Number(p.balance || 0) - receiveAmount) : 0;
               const info = [
                 `${p.quantity} qty`,
                 personalSpend > 0 ? `paid ${money(directPaid)} + spend ${money(personalSpend)}` : `paid ${money(p.paid)}`,
@@ -168,7 +193,12 @@ export default function ExpenseSplitPage() {
                     <div className="font-black text-lg truncate">{p.name}</div>
                     <div className="text-sm text-slate-400 mt-1">{info}</div>
                   </div>
-                  <span className={`text-xl font-black md:text-right ${p.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{p.balance >= 0 ? `Receives ${money(p.balance)}` : `Pays ${money(Math.abs(p.balance))}`}</span>
+                  <div className="text-xl font-black md:text-right">
+                    {receiveAmount > 0 && <span className="text-emerald-400 block">Receives {money(receiveAmount)}</span>}
+                    {pendingAmount > 0 && <span className="text-amber-300 block text-sm font-bold">Pending {money(pendingAmount)}</span>}
+                    {p.balance < 0 && <span className="text-rose-400 block">Pays {money(payAmount || Math.abs(Number(p.balance || 0)))}</span>}
+                    {receiveAmount === 0 && pendingAmount === 0 && p.balance >= 0 && <span className="text-slate-300 block">Settled</span>}
+                  </div>
                 </div>
               );
             })}

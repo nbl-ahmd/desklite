@@ -117,18 +117,28 @@ function calculate(sources, input) {
   const totalExpenseCents = expenses.reduce((sum, s) => sum + money(s.amount), 0);
   const totalIncomeCents = incomes.reduce((sum, s) => sum + money(s.amount), 0);
   const fundCents = incomes.filter((s) => fundIds.has(s.id)).reduce((sum, s) => sum + money(s.amount), 0);
-  const groupFundBaseCents = fundCents > 0 ? fundCents : Math.max(0, totalIncomeCents - totalExpenseCents);
   const paidBy = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
   const personalExpenseClaims = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
+  const creditExpenseClaims = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
+
+  let personalCreditCents = 0;
 
   for (const expense of expenses) {
     const participantName = familyParticipants.find((p) => matchesParticipantName(`${expense.name || ''} ${expense.description || ''}`, p.name));
     if (participantName) {
       const amount = money(expense.amount);
       paidBy[participantName.name] += amount;
-      personalExpenseClaims[participantName.name] += amount;
+      if (expense.mode === 'credit') {
+        creditExpenseClaims[participantName.name] += amount;
+        personalCreditCents += amount;
+      } else {
+        personalExpenseClaims[participantName.name] += amount;
+      }
     }
   }
+
+  const sharedExpenseCents = Math.max(0, totalExpenseCents - personalCreditCents);
+  const groupFundBaseCents = fundCents > 0 ? fundCents : Math.max(0, totalIncomeCents - sharedExpenseCents);
 
   for (const income of incomes) {
     if (fundIds.has(income.id)) continue;
@@ -136,7 +146,7 @@ function calculate(sources, input) {
     if (Object.prototype.hasOwnProperty.call(paidBy, name)) paidBy[name] += money(income.amount);
   }
 
-  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, totalExpenseCents - groupFundBaseCents) : totalExpenseCents;
+  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, sharedExpenseCents - groupFundBaseCents) : sharedExpenseCents;
   const quantityTotal = familyParticipants.reduce((sum, p) => sum + p.quantity, 0);
   const shares = {};
   let assigned = 0;
@@ -214,8 +224,9 @@ function calculate(sources, input) {
   const combinedSettlements = [...groupPayouts, ...settlements];
 
   return {
-    totalExpenses: currency(totalExpenseCents),
+    totalExpenses: currency(sharedExpenseCents),
     totalIncome: currency(totalIncomeCents),
+    creditExpenses: currency(personalCreditCents),
     groupFund: currency(fundCents),
     groupFundBeforeReimbursement: currency(fundBeforeReimbursement),
     groupFundRemaining: currency(fundBeforeReimbursement),
@@ -232,6 +243,7 @@ function calculate(sources, input) {
       paid: currency(b.paid),
       fairShare: currency(b.fairShare),
       personalExpense: currency(b.personalExpense),
+      creditExpense: currency(creditExpenseClaims[b.name] || 0),
       balance: currency(b.balance),
       fundApplied: currency(b.fundApplied || 0),
     })),
