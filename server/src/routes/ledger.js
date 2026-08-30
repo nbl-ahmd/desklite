@@ -6,7 +6,6 @@ const auth = require('../middleware/auth');
 const { requireSubscription, requireFeature } = require('../middleware/subscription');
 const Transaction = require('../models/Transaction');
 const puppeteer = require('puppeteer');
-const XLSX = require('xlsx');
 
 const MAX_EXPORT_ROWS = 5000;
 
@@ -318,7 +317,12 @@ router.post('/export/pdf', requireFeature('exports', { consume: true }), async (
   }
 });
 
-// POST /api/ledger/export/excel - scoped Excel export
+function csvCell(value) {
+  const text = value == null ? '' : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+// POST /api/ledger/export/excel - scoped spreadsheet-compatible CSV export
 router.post('/export/excel', requireFeature('exports', { consume: true }), async (req, res) => {
   try {
     const match = buildMatch(req);
@@ -338,20 +342,21 @@ router.post('/export/excel', requireFeature('exports', { consume: true }), async
       Paid: t.isPaid,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Ledger');
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const headers = ['Date', 'Type', 'Event', 'Amount', 'Mode', 'Customer', 'Description', 'DueDate', 'Paid'];
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(',')),
+    ].join('\n');
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="ledger.xlsx"');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="ledger.csv"');
     if (truncated) {
       res.setHeader('X-Export-Truncated', 'true');
     }
-    return res.end(buffer);
+    return res.end(csv);
   } catch (error) {
-    console.error('Ledger Excel export failed:', error);
-    return res.status(500).json({ message: 'Failed to export Excel' });
+    console.error('Ledger CSV export failed:', error);
+    return res.status(500).json({ message: 'Failed to export CSV' });
   }
 });
 

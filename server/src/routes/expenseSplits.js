@@ -157,29 +157,46 @@ function calculate(sources, input) {
     balance: (paidBy[p.name] || 0) - (shares[p.name] || 0),
   }));
 
+  const fundBeforeReimbursement = groupFundBaseCents;
+  const fundAllocationByName = Object.fromEntries(familyParticipants.map((p) => [p.name, 0]));
   let availableFund = input.groupFundMode === 'participant' ? groupFundBaseCents : 0;
   const fundAllocations = [];
-  const fundBeforeReimbursement = groupFundBaseCents;
-  for (const item of balances) {
-    if (item.balance < 0 && availableFund > 0) {
-      const used = Math.min(availableFund, -item.balance);
-      item.fundApplied = used;
-      item.balance += used;
-      availableFund -= used;
-      fundAllocations.push({ from: 'Group Fund', to: item.name, amount: currency(used) });
-    } else item.fundApplied = 0;
+
+  for (const item of balances.filter((entry) => entry.balance > 0).sort((a, b) => b.balance - a.balance)) {
+    if (availableFund <= 0) break;
+    const used = Math.min(availableFund, item.balance);
+    if (used <= 0) continue;
+    availableFund -= used;
+    fundAllocationByName[item.name] = used;
+    fundAllocations.push({ from: 'Group Fund', to: item.name, amount: currency(used) });
   }
 
-  const creditors = balances.filter((b) => b.balance > 0).map((b) => ({ ...b }));
-  const debtors = balances.filter((b) => b.balance < 0).map((b) => ({ ...b, balance: -b.balance }));
+  const settlementBalances = balances.map((item) => {
+    const fundApplied = fundAllocationByName[item.name] || 0;
+    return {
+      ...item,
+      fundApplied,
+      remainingBalance: item.balance > 0 ? item.balance - fundApplied : item.balance,
+    };
+  });
+
+  const finalReceivers = settlementBalances
+    .filter((b) => (b.remainingBalance || 0) > 0)
+    .map((b) => ({ ...b, remaining: b.remainingBalance }));
+  const finalPayers = settlementBalances
+    .filter((b) => b.balance < 0)
+    .map((b) => ({ ...b, remaining: Math.abs(b.balance) }));
+
   const settlements = [];
-  for (const debtor of debtors) {
-    for (const creditor of creditors) {
-      if (!debtor.balance || !creditor.balance) continue;
-      const amount = Math.min(debtor.balance, creditor.balance);
+  for (const debtor of finalPayers) {
+    let remainingDebt = debtor.remaining;
+    for (const creditor of finalReceivers) {
+      if (remainingDebt <= 0 || creditor.remaining <= 0) continue;
+      const amount = Math.min(remainingDebt, creditor.remaining);
+      if (amount <= 0) continue;
       settlements.push({ from: debtor.name, to: creditor.name, amount: currency(amount) });
-      debtor.balance -= amount;
-      creditor.balance -= amount;
+      remainingDebt -= amount;
+      creditor.remaining -= amount;
     }
   }
 
@@ -191,8 +208,8 @@ function calculate(sources, input) {
       reason: 'Personal expense reimbursement',
     }));
 
-  const remainingCredits = creditors.reduce((sum, item) => sum + item.balance, 0);
-  const remainingDebts = debtors.reduce((sum, item) => sum + item.balance, 0);
+  const remainingCredits = finalReceivers.reduce((sum, item) => sum + item.remainingBalance, 0);
+  const remainingDebts = finalPayers.reduce((sum, item) => sum + Math.abs(item.balance), 0);
   const groupPayouts = fundAllocations.map((item) => ({ from: 'Group Fund', to: item.to, amount: item.amount }));
   const combinedSettlements = [...groupPayouts, ...settlements];
 

@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
+import { useEffect, useMemo, useState } from 'react';
 import { getApiToken } from '@/utils/auth';
 import ReportExportMenu from '@/components/ReportExportMenu';
-import { CalendarDays, Check, Download, Image as ImageIcon, Plus, Save, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Plus, Save, Trash2, X } from 'lucide-react';
 
 const apiUrl = () => `${process.env.NEXT_PUBLIC_API_URL}/api/expense-splits`;
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -24,7 +23,6 @@ export default function ExpenseSplitPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [incomeSourceMode, setIncomeSourceMode] = useState('all');
-  const summaryRef = useRef(null);
 
   const request = async (path, options = {}) => {
     const token = await getApiToken();
@@ -119,21 +117,6 @@ export default function ExpenseSplitPage() {
     try { await request(`/${id}`, { method: 'DELETE' }); if (currentId === id) setCurrentId(null); await loadSaved(); } catch (error) { setMessage(error.message); }
   };
 
-  const exportPdf = async () => {
-    if (!currentId) setMessage('Save this split to enable production exports and sharing.');
-  };
-
-  const downloadSummaryImage = async () => {
-    if (!summaryRef.current) return;
-    const canvas = await html2canvas(summaryRef.current, { backgroundColor: '#0f172a', scale: 2, useCORS: true });
-    const link = document.createElement('a');
-    const stem = (title || 'expense-split').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'expense-split';
-    link.href = canvas.toDataURL('image/png');
-    link.download = `${stem}.png`;
-    link.click();
-    link.remove();
-  };
-
   const sourceSection = (type, label, color) => {
     const rows = sources.filter((s) => s.type === type);
     return <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -148,99 +131,49 @@ export default function ExpenseSplitPage() {
     {message && <div className="px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm">{message}</div>}
     <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm"><div className="flex items-center gap-2 text-sm font-black text-slate-700 mb-3"><CalendarDays size={18} /> Date range</div><div className="flex flex-col sm:flex-row gap-3"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="flex-1 bg-slate-50 rounded-xl px-4 py-3 font-bold" /><span className="hidden sm:flex items-center text-slate-400">to</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="flex-1 bg-slate-50 rounded-xl px-4 py-3 font-bold" /><div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Income</label><select value={incomeSourceMode} onChange={(e) => setIncomeSourceMode(e.target.value)} className="bg-transparent px-1 py-3 text-sm font-bold text-slate-700 outline-none"><option value="all">All</option><option value="bills">Bills only</option></select></div><button onClick={() => loadSources()} disabled={loading} className="px-4 py-3 rounded-xl bg-slate-100 font-bold">Load records</button></div></div>
     <div className="grid lg:grid-cols-2 gap-6">{sourceSection('income', 'Income and bill items', 'bg-emerald-500')}{sourceSection('expense', 'Expenses', 'bg-rose-500')}</div>
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5"><div className="flex items-center justify-between mb-4"><div><h2 className="font-black text-slate-900">Families / participants</h2><p className="text-xs text-slate-400">Quantity controls each participant’s share. Disabled people are excluded.</p></div><button onClick={addParticipant} className="flex items-center gap-1 text-sm font-bold text-blue-600"><Plus size={16} /> Add</button></div><div className="space-y-3">{participants.map((p, index) => <div key={`${p.name}-${index}`} className={`flex gap-2 ${p.enabled === false ? 'opacity-50' : ''}`}><button onClick={() => updateParticipant(index, 'enabled', p.enabled === false)} className={`w-11 rounded-xl flex items-center justify-center ${p.enabled === false ? 'bg-slate-200 text-slate-400' : 'bg-emerald-100 text-emerald-700'}`} title="Enable or disable participant">{p.enabled === false ? <X size={17} /> : <Check size={17} />}</button><input value={p.name} onChange={(e) => updateParticipant(index, 'name', e.target.value)} placeholder="Family or person" className="flex-1 bg-slate-50 rounded-xl px-4 py-3 font-bold" /><input type="number" min="0" step="1" value={p.quantity} onChange={(e) => updateParticipant(index, 'quantity', e.target.value)} className="w-24 bg-slate-50 rounded-xl px-3 py-3 font-bold text-center" title="Quantity" /><button onClick={() => removeParticipant(index)} className="p-3 rounded-xl bg-rose-50 text-rose-600"><Trash2 size={18} /></button></div>)}</div><div className="mt-5 pt-5 border-t border-slate-100 flex flex-col sm:flex-row gap-3 sm:items-center"><label className="text-sm font-bold text-slate-600">Group fund treatment</label><select value={groupFundMode} onChange={(e) => setGroupFundMode(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-3 font-bold"><option value="participant">Fund-first reimbursement</option><option value="offset">Fund offsets expenses</option></select><span className="text-xs text-slate-400">Any marked income counts as the shared family fund.</span></div></div>
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5"><div className="flex items-center justify-between mb-4"><div><h2 className="font-black text-slate-900">Families / participants</h2><p className="text-xs text-slate-400">Quantity controls each participant’s share. Disabled people are excluded.</p></div><button onClick={addParticipant} className="flex items-center gap-1 text-sm font-bold text-blue-600"><Plus size={16} /> Add</button></div><div className="space-y-3">{participants.map((p, index) => <div key={`${p.name}-${index}`} className={`grid grid-cols-[44px_minmax(0,1fr)_84px_44px] gap-2 ${p.enabled === false ? 'opacity-50' : ''}`}><button onClick={() => updateParticipant(index, 'enabled', p.enabled === false)} className={`h-11 rounded-xl flex items-center justify-center ${p.enabled === false ? 'bg-slate-200 text-slate-400' : 'bg-emerald-100 text-emerald-700'}`} title="Enable or disable participant">{p.enabled === false ? <X size={17} /> : <Check size={17} />}</button><input value={p.name} onChange={(e) => updateParticipant(index, 'name', e.target.value)} placeholder="Family or person" className="min-w-0 bg-slate-50 rounded-xl px-4 py-3 font-bold" /><input type="number" min="0" step="1" value={p.quantity} onChange={(e) => updateParticipant(index, 'quantity', e.target.value)} className="bg-slate-50 rounded-xl px-3 py-3 font-bold text-center" title="Quantity" /><button onClick={() => removeParticipant(index)} className="h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><Trash2 size={18} /></button></div>)}</div><div className="mt-5 pt-5 border-t border-slate-100 flex flex-col sm:flex-row gap-3 sm:items-center"><label className="text-sm font-bold text-slate-600">Shared fund treatment</label><select value={groupFundMode} onChange={(e) => setGroupFundMode(e.target.value)} className="bg-slate-50 rounded-xl px-4 py-3 font-bold"><option value="participant">Show full family balance</option><option value="offset">Reduce split expense</option></select><span className="text-xs text-slate-400">Marked income is treated as the shared trip fund.</span></div></div>
     {result && (
       <div className="space-y-6">
-        <div ref={summaryRef} className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl">
-          <div className="flex flex-col sm:flex-row justify-between gap-3 mb-5">
+        <div className="bg-slate-950 rounded-[28px] p-4 sm:p-6 text-white shadow-xl overflow-hidden">
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-black">Split result</h2>
+              <h2 className="text-2xl font-black">Split result</h2>
               <p className="text-slate-400 text-sm">{result.selectedSourceCount} selected records · {result.reconciliation === 0 ? 'Reconciled' : 'Review rounding'}</p>
             </div>
-            <div className="flex gap-2">
-              <button onClick={exportPdf} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-sm"><Download size={16} /> PDF</button>
-              <button onClick={downloadSummaryImage} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-900 font-bold text-sm"><ImageIcon size={16} /> Image</button>
-            </div>
+            {currentId ? <ReportExportMenu payload={{ kind: 'split', splitId: currentId }} title={title || 'Expense Split'} tone="dark" /> : <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-slate-300">Save the split to enable PDF and image sharing.</div>}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-            {[['Expenses', result.totalExpenses], ['Income', result.totalIncome], ['Fund before reimbursement', result.groupFundBeforeReimbursement ?? result.groupFund], ['Per person', result.costPerPerson], ['Quantity', result.totalQuantity]].map(([label, value]) => (
-              <div key={label} className="bg-white/10 rounded-2xl p-3">
-                <p className="text-xs text-slate-400">{label}</p>
-                <p className="font-black mt-1">{label === 'Quantity' ? value : money(value)}</p>
+            {[['Expenses', result.totalExpenses], ['Income', result.totalIncome], ['Fund balance', result.groupFundBeforeReimbursement ?? result.groupFund], ['Per person', result.costPerPerson], ['Quantity', result.totalQuantity]].map(([label, value]) => (
+              <div key={label} className="bg-white/10 rounded-2xl p-3 sm:p-4">
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">{label}</p>
+                <p className="font-black mt-1 text-lg break-words">{label === 'Quantity' ? value : money(value)}</p>
               </div>
             ))}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {result.participants.map((p) => {
-              const reimbursement = result.reimbursements?.find((item) => item.name === p.name);
+              const personalSpend = Number(p.personalExpense || 0);
+              const directPaid = Math.max(0, Number(p.paid || 0) - personalSpend);
               const info = [
                 `${p.quantity} qty`,
-                `paid ${money(p.paid)}`,
+                personalSpend > 0 ? `paid ${money(directPaid)} + spend ${money(personalSpend)}` : `paid ${money(p.paid)}`,
                 `share ${money(p.fairShare)}`,
-                reimbursement ? `reimbursement ${money(reimbursement.amount)}` : null,
               ].filter(Boolean).join(' · ');
 
               return (
-                <div key={p.name} className="bg-white/10 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <span className="font-black">{p.name}</span>
-                    <span className="text-xs text-slate-400 ml-2">{info}</span>
+                <div key={p.name} className="bg-white/10 rounded-2xl px-4 py-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-black text-lg truncate">{p.name}</div>
+                    <div className="text-sm text-slate-400 mt-1">{info}</div>
                   </div>
-                  <span className={p.balance >= 0 ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>{p.balance >= 0 ? `Receives ${money(p.balance)}` : `Pays ${money(Math.abs(p.balance))}`}</span>
+                  <span className={`text-xl font-black md:text-right ${p.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{p.balance >= 0 ? `Receives ${money(p.balance)}` : `Pays ${money(Math.abs(p.balance))}`}</span>
                 </div>
               );
             })}
           </div>
-
-          {result.groupFundAllocations?.length > 0 && (
-            <div className="mt-6">
-              <h3 className="font-black mb-2 text-white">Group fund payouts</h3>
-              <div className="space-y-2">
-                {result.groupFundAllocations.map((item, i) => (
-                  <div key={`${item.from}-${item.to}-${i}`} className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3 text-sm">
-                    <span className="font-bold text-slate-300">Group Fund</span>
-                    <span className="text-slate-400">pays</span>
-                    <span className="font-bold text-white">{item.to}</span>
-                    <span className="ml-auto font-black text-emerald-300">{money(item.amount)}</span>
-                  </div>
-                ))}
-              </div>
-              {typeof result.groupFundAfterReimbursement !== 'undefined' && (
-                <div className="mt-3 rounded-xl bg-slate-800/60 px-3 py-2 text-xs text-slate-300">Remaining in the fund: {money(result.groupFundAfterReimbursement)}</div>
-              )}
-            </div>
-          )}
-
-          {((result.groupFundAllocations?.length || 0) + (result.settlements?.length || 0)) > 0 ? (
-            <div className="mt-6">
-              <h3 className="font-black mt-6 mb-2">Settlement transfers</h3>
-              <div className="space-y-2">
-                {[
-                  ...(result.groupFundAllocations || []).map((item, i) => ({ kind: 'group', from: 'Group Fund', to: item.to, amount: item.amount, key: `group-${item.to}-${i}` })),
-                  ...(result.settlements || []).map((item, i) => ({ kind: 'family', from: item.from, to: item.to, amount: item.amount, key: `family-${item.from}-${item.to}-${i}` })),
-                ].map((entry) => (
-                  <div key={entry.key} className="flex items-center gap-2 text-sm py-2">
-                    <span className="font-bold">{entry.from}</span>
-                    <span className="text-slate-400">pays</span>
-                    <span className="font-bold">{entry.to}</span>
-                    <span className="ml-auto text-emerald-300 font-black">{money(entry.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-slate-400 text-sm mt-6">No transfers needed.</p>
-          )}
         </div>
-
-        {result && currentId && (
-          <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 font-black text-slate-900">Download or share split</h2>
-            <ReportExportMenu payload={{ kind: 'split', splitId: currentId }} title={title || 'Expense Split'} />
-          </div>
-        )}
       </div>
     )}
     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5"><h2 className="font-black text-slate-900 mb-3">Saved splits</h2><div className="flex gap-2 mb-4"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Split title, e.g. Family trip" className="flex-1 bg-slate-50 rounded-xl px-4 py-3 font-bold" /></div>{savedSplits.length === 0 ? <p className="text-sm text-slate-400">No saved splits yet.</p> : <div className="space-y-2">{savedSplits.map((split) => <div key={split._id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50"><button onClick={() => openSaved(split._id)} className="flex-1 text-left"><p className="font-bold text-slate-800">{split.title}</p><p className="text-xs text-slate-400">{new Date(split.from).toLocaleDateString('en-IN')} – {new Date(split.to).toLocaleDateString('en-IN')}</p></button><button onClick={() => removeSaved(split._id)} className="p-2 text-rose-500"><Trash2 size={17} /></button></div>)}</div>}</div>

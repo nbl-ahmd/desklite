@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { ledger } from '@/lib/api';
 import { format } from 'date-fns';
 import { Loader2 } from 'lucide-react';
+import ReportExportMenu from '@/components/ReportExportMenu';
 
 const ranges = [
   { label: 'Daily', value: 'daily' },
@@ -52,7 +53,8 @@ export default function ReportsSummaryPage() {
             <h1 className="text-2xl font-bold text-gray-900">Reports Dashboard</h1>
             <p className="text-sm text-gray-600">Summaries by period and payment mode</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ReportExportMenu payload={{ kind: 'transactions' }} title="Reports Dashboard" />
             {ranges.map((r) => (
               <button
                 key={r.value}
