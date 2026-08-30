@@ -4,33 +4,11 @@ const puppeteer = require('puppeteer');
 const auth = require('../middleware/auth');
 const { requireFeature } = require('../middleware/subscription');
 const Transaction = require('../models/Transaction');
+const { getBrowserOptions } = require('../utils/browser');
 
 router.use(auth);
 
 const MAX_EXPORT_ROWS = 5000;
-
-// Helper to get browser launch options based on environment
-const getBrowserOptions = () => {
-  const options = {
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process'
-    ]
-  };
-  
-  // Use bundled Chromium in production, allow custom path in development
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    options.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
-  
-  return options;
-};
 
 // Helper to safely generate PDF
 const generatePDF = async (html) => {
