@@ -14,7 +14,7 @@ const MAX_EXPORT_ROWS = 5000;
 const generatePDF = async (html) => {
   let browser = null;
   try {
-    browser = await puppeteer.launch(getBrowserOptions());
+    browser = await puppeteer.launch(await getBrowserOptions());
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
     const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });

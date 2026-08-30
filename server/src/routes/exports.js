@@ -5,9 +5,11 @@ const auth = require('../middleware/auth');
 const { requireFeature } = require('../middleware/subscription');
 const { consumeExport } = require('../services/subscriptionService');
 const Transaction = require('../models/Transaction');
+const Bill = require('../models/Bill');
 const ExpenseSplit = require('../models/ExpenseSplit');
 const User = require('../models/User');
 const { getBrowserOptions } = require('../utils/browser');
+const { buildReportHtml } = require('../utils/reportHtml');
 
 const router = express.Router();
 const MAX_ROWS = 5000;
@@ -30,6 +32,61 @@ function range(value = {}) {
   return { from, to };
 }
 
+async function loadSplitSources(req, from, to) {
+  const filter = { shopId: objectId(req.user.shopId), date: { $gte: from, $lte: to } };
+  const [transactions, bills] = await Promise.all([
+    Transaction.find(filter).sort({ date: -1 }).lean(),
+    Bill.find({ shopId: objectId(req.user.shopId), billDate: { $gte: from, $lte: to } }).sort({ billDate: -1 }).lean(),
+  ]);
+
+  const linkedBillTransactions = new Set(bills.map((bill) => String(bill.transactionId)).filter(Boolean));
+  const sources = [];
+
+  for (const tx of transactions) {
+    if (tx.type === 'income' && linkedBillTransactions.has(String(tx._id))) continue;
+    sources.push({
+      id: `transaction:${tx._id}`,
+      kind: 'transaction',
+      type: tx.type,
+      date: tx.date,
+      amount: Number(tx.amount) || 0,
+      name: tx.customerName || '',
+      description: tx.description || (tx.type === 'income' ? 'Income' : 'Expense'),
+      mode: tx.mode || null,
+    });
+  }
+
+  for (const bill of bills) {
+    const base = `bill:${bill._id}`;
+    (bill.items || []).forEach((item, index) => sources.push({
+      id: `${base}:item:${index}`,
+      kind: 'bill-item',
+      type: 'income',
+      date: bill.billDate,
+      amount: Number(item.total) || 0,
+      name: bill.customerName || '',
+      description: `${bill.billNumber} · ${item.name}`,
+      mode: bill.paymentMode || null,
+    }));
+    [['shipping', bill.shippingCharges], ['other', bill.otherCharges], ['round-off', bill.roundOff]].forEach(([label, amount]) => {
+      if (Number(amount)) {
+        sources.push({
+          id: `${base}:charge:${label}`,
+          kind: 'bill-charge',
+          type: 'income',
+          date: bill.billDate,
+          amount: Number(amount),
+          name: bill.customerName || '',
+          description: `${bill.billNumber} · ${label}`,
+          mode: bill.paymentMode || null,
+        });
+      }
+    });
+  }
+
+  return sources;
+}
+
 async function reportData(req) {
   const body = req.body || {};
   const { kind = 'transactions', mode, type, customerName } = body;
@@ -41,8 +98,21 @@ async function reportData(req) {
     const split = await ExpenseSplit.findOne({ _id: body.splitId, shopId: objectId(req.user.shopId) }).lean();
     if (!split) throw new Error('Split not found');
     const result = split.calculation || {};
+    const splitSources = await loadSplitSources(req, split.from, split.to);
+    const selectedSources = splitSources.filter((item) => (split.selectedSourceIds || []).includes(item.id));
     return { kind, title: split.title || text.share, subtitle: `${dateText(split.from)} – ${dateText(split.to)}`, user, language, text,
       metrics: [{ label: text.expense, value: money(result.totalExpenses) }, { label: text.income, value: money(result.totalIncome) }, { label: 'Fund balance', value: money(result.groupFundRemaining ?? result.groupFund) }, { label: 'Per person', value: money(result.costPerPerson) }, { label: 'Quantity', value: String(result.totalQuantity || 0) }],
+      selectedSources: selectedSources.map((item) => ({
+        date: dateText(item.date),
+        kind: item.kind,
+        type: item.type,
+        amount: item.amount,
+        mode: item.mode || '-',
+        note: item.description || item.name || '-',
+      })),
+      settlements: result.combinedSettlements || [],
+      reimbursements: result.reimbursements || [],
+      fundAllocations: result.groupFundAllocations || [],
       rows: (result.participants || []).map((item) => {
         const personalSpend = Number(item.personalExpense || 0);
         const directPaid = Math.max(0, Number(item.paid || 0) - personalSpend);
@@ -98,7 +168,7 @@ router.post('/report', async (req, res) => {
     browser = await puppeteer.launch(await getBrowserOptions());
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 900, deviceScaleFactor: 2 });
-    await page.setContent(html(data, format === 'png'), { waitUntil: 'networkidle0' });
+    await page.setContent(buildReportHtml(data, format === 'png'), { waitUntil: 'networkidle0' });
     const file = format === 'pdf' ? await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } }) : await page.screenshot({ type: 'png', fullPage: true });
     await consumeExport(req.subscription);
     const extension = format === 'pdf' ? 'pdf' : 'png';
