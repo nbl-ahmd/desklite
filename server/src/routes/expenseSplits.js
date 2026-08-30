@@ -137,8 +137,7 @@ function calculate(sources, input) {
     }
   }
 
-  const sharedExpenseCents = Math.max(0, totalExpenseCents - personalCreditCents);
-  const groupFundBaseCents = fundCents > 0 ? fundCents : Math.max(0, totalIncomeCents - sharedExpenseCents);
+  const groupFundBaseCents = (fundCents > 0 ? fundCents : Math.max(0, totalIncomeCents - totalExpenseCents)) + personalCreditCents;
 
   for (const income of incomes) {
     if (fundIds.has(income.id)) continue;
@@ -146,7 +145,7 @@ function calculate(sources, input) {
     if (Object.prototype.hasOwnProperty.call(paidBy, name)) paidBy[name] += money(income.amount);
   }
 
-  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, sharedExpenseCents - groupFundBaseCents) : sharedExpenseCents;
+  const splitExpenseCents = input.groupFundMode === 'offset' ? Math.max(0, totalExpenseCents - groupFundBaseCents) : totalExpenseCents;
   const quantityTotal = familyParticipants.reduce((sum, p) => sum + p.quantity, 0);
   const shares = {};
   let assigned = 0;
@@ -224,7 +223,7 @@ function calculate(sources, input) {
   const combinedSettlements = [...groupPayouts, ...settlements];
 
   return {
-    totalExpenses: currency(sharedExpenseCents),
+    totalExpenses: currency(totalExpenseCents),
     totalIncome: currency(totalIncomeCents),
     creditExpenses: currency(personalCreditCents),
     groupFund: currency(fundCents),
