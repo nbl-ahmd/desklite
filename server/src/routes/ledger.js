@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const { requireSubscription, requireFeature } = require('../middleware/subscription');
 const Transaction = require('../models/Transaction');
 const puppeteer = require('puppeteer');
+const { getBrowserOptions } = require('../utils/browser');
 
 const MAX_EXPORT_ROWS = 5000;
 
@@ -299,7 +300,7 @@ router.post('/export/pdf', requireFeature('exports', { consume: true }), async (
       </html>
     `;
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const browser = await puppeteer.launch(await getBrowserOptions());
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });

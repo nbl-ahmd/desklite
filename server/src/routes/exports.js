@@ -7,6 +7,7 @@ const { consumeExport } = require('../services/subscriptionService');
 const Transaction = require('../models/Transaction');
 const ExpenseSplit = require('../models/ExpenseSplit');
 const User = require('../models/User');
+const { getBrowserOptions } = require('../utils/browser');
 
 const router = express.Router();
 const MAX_ROWS = 5000;
@@ -94,7 +95,7 @@ router.post('/report', async (req, res) => {
     const { format = 'pdf' } = req.body || {};
     if (!['pdf', 'png'].includes(format)) return res.status(400).json({ message: 'format must be pdf or png' });
     const data = await reportData(req);
-    browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch(await getBrowserOptions());
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 900, deviceScaleFactor: 2 });
     await page.setContent(html(data, format === 'png'), { waitUntil: 'networkidle0' });
